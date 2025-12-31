@@ -1,0 +1,9 @@
+id,name,category,price,in_stock
+101,Wireless Mouse,Electronics,49.99,true
+102,Mechanical Keyboard,Electronics,199.99,true
+103,4K Monitor,Electronics,299.99,true
+104,USB-C Hub,Electronics,79.99,true
+105,Laptop Stand,Accessories,45.99,false
+106,Webcam HD,Electronics,89.99,true
+107,Desk Lamp,Office,35.99,true
+108,Ergonomic Chair,Furniture,449.99,true

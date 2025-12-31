@@ -1,0 +1,27 @@
+[package]
+name = "knowhere"
+version = "0.1.0"
+edition = "2021"
+description = "A lightweight SQL engine for querying CSV and Parquet files via an interactive TUI"
+license = "MIT"
+authors = ["Varun"]
+repository = "https://github.com/saivarunk/knowhere"
+homepage = "https://github.com/saivarunk/knowhere"
+readme = "README.md"
+keywords = ["sql", "csv", "parquet", "tui", "database"]
+categories = ["command-line-utilities", "database"]
+
+[[bin]]
+name = "knowhere"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.28"
+crossterm = "0.28"
+clap = { version = "4", features = ["derive"] }
+thiserror = "1.0"
+snap = "1.1"
+flate2 = "1.0"
+
+[dev-dependencies]
+tempfile = "3"

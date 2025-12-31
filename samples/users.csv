@@ -1,0 +1,11 @@
+id,name,email,age,department,salary,active
+1,Alice Johnson,alice@example.com,32,Engineering,95000.00,true
+2,Bob Smith,bob@example.com,28,Marketing,65000.00,true
+3,Charlie Brown,charlie@example.com,45,Engineering,120000.00,true
+4,Diana Ross,diana@example.com,35,Sales,78000.00,false
+5,Edward Norton,edward@example.com,29,Engineering,88000.00,true
+6,Fiona Apple,fiona@example.com,41,Marketing,72000.00,true
+7,George Lucas,george@example.com,55,Engineering,150000.00,true
+8,Hannah Montana,hannah@example.com,24,Sales,55000.00,true
+9,Ivan Petrov,ivan@example.com,38,Engineering,105000.00,false
+10,Julia Roberts,julia@example.com,42,Marketing,85000.00,true
