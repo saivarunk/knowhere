@@ -1,66 +1,63 @@
 name: Release
 
-  on:
-    push:
-      tags:
-        - 'v*'
+on:
+  push:
+    tags:
+      - "v*"
 
-  jobs:
-    build:
-      strategy:
-        matrix:
-          include:
-            - target: x86_64-apple-darwin
-              os: macos-latest
-            - target: aarch64-apple-darwin
-              os: macos-latest
-            - target: x86_64-unknown-linux-gnu
-              os: ubuntu-latest
-            - target: aarch64-unknown-linux-gnu
-              os: ubuntu-latest
+permissions:
+  contents: write
 
-      runs-on: ${{ matrix.os }}
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
 
-      steps:
-        - uses: actions/checkout@v4
+    runs-on: ${{ matrix.os }}
 
-        - name: Install Rust
-          uses: dtolnay/rust-action@stable
-          with:
-            targets: ${{ matrix.target }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        - name: Install cross-compilation tools
-          if: matrix.target == 'aarch64-unknown-linux-gnu'
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
 
-        - name: Build
-          run: cargo build --release --target ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
 
-        - name: Package
-          run: |
-            cd target/${{ matrix.target }}/release
-            tar -czvf knowhere-${{ github.ref_name }}-${{ matrix.target }}.tar.gz knowhere
-            mv knowhere-${{ github.ref_name }}-${{ matrix.target }}.tar.gz ../../../
+      - name: Package
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czvf ../../../knowhere-${{ github.ref_name }}-${{ matrix.target }}.tar.gz knowhere
 
-        - name: Upload artifact
-          uses: actions/upload-artifact@v4
-          with:
-            name: knowhere-${{ matrix.target }}
-            path: knowhere-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowhere-${{ matrix.target }}
+          path: knowhere-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
 
-    release:
-      needs: build
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/download-artifact@v4
+  release:
+    needs: build
+    runs-on: ubuntu-latest
 
-        - name: Create Release
-          uses: softprops/action-gh-release@v1
-          with:
-            files: |
-              knowhere-x86_64-apple-darwin/knowhere-*.tar.gz
-              knowhere-aarch64-apple-darwin/knowhere-*.tar.gz
-              knowhere-x86_64-unknown-linux-gnu/knowhere-*.tar.gz
-              knowhere-aarch64-unknown-linux-gnu/knowhere-*.tar.gz
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.tar.gz
+          generate_release_notes: true
