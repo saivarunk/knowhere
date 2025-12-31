@@ -61,3 +61,83 @@ jobs:
         with:
           files: artifacts/**/*.tar.gz
           generate_release_notes: true
+
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Calculate SHA256 checksums
+        id: checksums
+        run: |
+          SHA256_ARM64_DARWIN=$(shasum -a 256 artifacts/knowhere-aarch64-apple-darwin/knowhere-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz | awk '{print $1}')
+          SHA256_X86_64_DARWIN=$(shasum -a 256 artifacts/knowhere-x86_64-apple-darwin/knowhere-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz | awk '{print $1}')
+          SHA256_X86_64_LINUX=$(shasum -a 256 artifacts/knowhere-x86_64-unknown-linux-gnu/knowhere-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz | awk '{print $1}')
+
+          echo "sha256_arm64_darwin=$SHA256_ARM64_DARWIN" >> $GITHUB_OUTPUT
+          echo "sha256_x86_64_darwin=$SHA256_X86_64_DARWIN" >> $GITHUB_OUTPUT
+          echo "sha256_x86_64_linux=$SHA256_X86_64_LINUX" >> $GITHUB_OUTPUT
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Homebrew formula
+        run: |
+          cat > knowhere.rb << 'EOF'
+          class Knowhere < Formula
+            desc "A lightweight SQL engine for querying CSV and Parquet files via TUI"
+            homepage "https://github.com/saivarunk/knowhere"
+            version "${{ steps.version.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/saivarunk/knowhere/releases/download/${{ github.ref_name }}/knowhere-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz"
+                sha256 "${{ steps.checksums.outputs.sha256_arm64_darwin }}"
+              end
+
+              on_intel do
+                url "https://github.com/saivarunk/knowhere/releases/download/${{ github.ref_name }}/knowhere-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz"
+                sha256 "${{ steps.checksums.outputs.sha256_x86_64_darwin }}"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "https://github.com/saivarunk/knowhere/releases/download/${{ github.ref_name }}/knowhere-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz"
+                sha256 "${{ steps.checksums.outputs.sha256_x86_64_linux }}"
+              end
+            end
+
+            def install
+              bin.install "knowhere"
+            end
+
+            test do
+              assert_match "knowhere", shell_output("#{bin}/knowhere --version")
+            end
+          end
+          EOF
+
+      - name: Push to Homebrew tap
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        with:
+          source-directory: "."
+          destination-github-username: "saivarunk"
+          destination-repository-name: "homebrew-knowhere"
+          target-branch: main
+          target-directory: Formula
+          commit-message: "Update knowhere to ${{ github.ref_name }}"
+          user-name: github-actions[bot]
+          user-email: github-actions[bot]@users.noreply.github.com
