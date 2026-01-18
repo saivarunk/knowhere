@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { FolderOpen, Play, RefreshCw, GripHorizontal, Save, FileText, Clock, ChevronDown } from 'lucide-react';
+import { FolderOpen, Play, RefreshCw, GripHorizontal, Save, FileText, Clock, ChevronDown, Database } from 'lucide-react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 import { Sidebar } from './components/Sidebar';
@@ -222,41 +222,49 @@ function App() {
     <div className="h-screen flex flex-col bg-[color:var(--bg-primary)]">
       {/* Toolbar */}
       <div className="h-11 flex items-center gap-2 px-3 border-b bg-[color:var(--bg-secondary)]">
-        {/* Data Files */}
-        <button
-          onClick={handleOpenFile}
-          disabled={loadingPath}
-          className="btn btn-secondary text-xs gap-1.5 disabled:opacity-50"
-        >
-          <FolderOpen size={14} />
-          Open File
-        </button>
-        <button
-          onClick={handleOpenFolder}
-          disabled={loadingPath}
-          className="btn btn-secondary text-xs gap-1.5 disabled:opacity-50"
-        >
-          <FolderOpen size={14} />
-          Open Folder
-        </button>
+        {/* Data Section */}
+        <div className="flex items-center gap-1.5">
+          <Database size={16} style={{ color: 'var(--text-muted)' }} />
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Data</span>
+          <button
+            onClick={handleOpenFile}
+            disabled={loadingPath}
+            className="btn btn-secondary text-xs gap-1.5 disabled:opacity-50"
+          >
+            <FolderOpen size={14} />
+            Open File
+          </button>
+          <button
+            onClick={handleOpenFolder}
+            disabled={loadingPath}
+            className="btn btn-secondary text-xs gap-1.5 disabled:opacity-50"
+          >
+            <FolderOpen size={14} />
+            Open Folder
+          </button>
+        </div>
 
-        <div className="w-px h-5 bg-[color:var(--border)] mx-1" />
+        <div className="w-px h-6 bg-[color:var(--border)] mx-2" />
 
-        {/* Query Files */}
-        <button
-          onClick={handleOpenQuery}
-          className="btn btn-secondary text-xs gap-1.5"
-        >
-          <FileText size={14} />
-          Open Query
-        </button>
-        <button
-          onClick={handleSaveQuery}
-          className="btn btn-secondary text-xs gap-1.5"
-        >
-          <Save size={14} />
-          Save Query
-        </button>
+        {/* Queries Section */}
+        <div className="flex items-center gap-1.5">
+          <FileText size={16} style={{ color: 'var(--text-muted)' }} />
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Queries</span>
+          <button
+            onClick={handleOpenQuery}
+            className="btn btn-secondary text-xs gap-1.5"
+          >
+            <FileText size={14} />
+            Open
+          </button>
+          <button
+            onClick={handleSaveQuery}
+            className="btn btn-secondary text-xs gap-1.5"
+          >
+            <Save size={14} />
+            Save
+          </button>
+        </div>
 
         {/* Recent Queries Dropdown */}
         <div className="relative">
