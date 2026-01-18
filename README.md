@@ -6,9 +6,11 @@ A powerful SQL engine for querying CSV, Parquet, Delta Lake, and SQLite files vi
 
 - **Apache DataFusion Engine** - Production-grade SQL engine with query optimization and full ANSI SQL support
 - **Multiple Format Support** - Query CSV, Parquet, Delta Lake, and SQLite files
+- **Desktop GUI** - Modern IDE-like interface with Monaco editor, intellisense, and resizable panes
 - **Interactive TUI** - Vim-style terminal interface for exploring your data
 - **Multi-Table Queries** - Point to a folder and JOIN across different file formats
 - **Advanced SQL** - CTEs, window functions, subqueries, UNION, and 100+ built-in functions
+- **Query Persistence** - Save and load SQL queries, with recent queries tracking
 - **Zero Configuration** - Automatic schema inference and format detection
 
 ## Installation
@@ -22,8 +24,14 @@ curl -fsSL https://raw.githubusercontent.com/saivarunk/knowhere/main/install.sh 
 ### Using Homebrew
 
 ```bash
+# Add the tap
 brew tap saivarunk/knowhere
+
+# Install CLI (terminal interface)
 brew install knowhere
+
+# Install GUI (desktop app)
+brew install --cask knowhere
 ```
 
 ### Building from Source
