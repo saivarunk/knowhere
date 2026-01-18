@@ -2,6 +2,8 @@
 
 A powerful SQL engine for querying CSV, Parquet, Delta Lake, and SQLite files via an interactive TUI or command line. Built on Apache DataFusion for production-grade query performance.
 
+![Knowhere GUI](docs/assets/screenshots/gui-screenshot-1.png)
+
 ## Features
 
 - **Apache DataFusion Engine** - Production-grade SQL engine with query optimization and full ANSI SQL support

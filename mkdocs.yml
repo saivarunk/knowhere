@@ -1,0 +1,74 @@
+site_name: Knowhere
+site_description: A SQL engine for querying CSV, Parquet, Delta Lake files. Desktop GUI + Terminal TUI.
+site_url: https://saivarunk.github.io/knowhere
+repo_name: saivarunk/knowhere
+repo_url: https://github.com/saivarunk/knowhere
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+  - GUI:
+    - Overview: gui/overview.md
+    - Features: gui/features.md
+  - TUI:
+    - Overview: tui/overview.md
+    - Keybindings: tui/keybindings.md
+  - Architecture: architecture.md
+  - SQL Reference:
+    - Queries: sql/queries.md
+    - Functions: sql/functions.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/saivarunk/knowhere
