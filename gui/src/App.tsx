@@ -204,6 +204,7 @@ function App() {
               onChange={setQuery}
               onExecute={handleExecute}
               theme={theme}
+              tables={tables}
             />
           </div>
 
