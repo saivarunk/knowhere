@@ -136,6 +136,16 @@ impl DataFusionContext {
     pub fn table_count(&self) -> usize {
         self.table_names.len()
     }
+
+    pub fn get_table_schema(&self, table_name: &str) -> Option<crate::storage::table::Schema> {
+        use super::conversion::convert_schema;
+        
+        self.runtime.block_on(async {
+            let provider = self.session.table_provider(table_name).await.ok()?;
+            let arrow_schema = provider.schema();
+            convert_schema(&arrow_schema).ok()
+        })
+    }
 }
 
 impl Default for DataFusionContext {
