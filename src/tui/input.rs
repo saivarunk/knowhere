@@ -130,9 +130,6 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) {
             }
         }
 
-        // Execute query
-        KeyCode::Enter => app.execute_query(),
-
         // Clear
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.clear_query();
@@ -145,20 +142,19 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) {
 fn handle_insert_mode(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.enter_normal_mode(),
-        KeyCode::Enter => {
-            app.execute_query();
-            app.enter_normal_mode();
-        }
+        // Enter now inserts a newline
+        KeyCode::Enter => app.insert_char('\n'),
         KeyCode::Backspace => app.delete_char(),
         KeyCode::Delete => app.delete_char_forward(),
         KeyCode::Left => app.move_cursor_left(),
         KeyCode::Right => app.move_cursor_right(),
         KeyCode::Home => app.move_cursor_start(),
         KeyCode::End => app.move_cursor_end(),
-        KeyCode::Up => app.history_up(),
-        KeyCode::Down => app.history_down(),
+        KeyCode::Up => app.move_cursor_up(),
+        KeyCode::Down => app.move_cursor_down(),
+        KeyCode::Tab => app.insert_char('\t'),
 
-        // Ctrl shortcuts
+        // Ctrl shortcuts (traditional editor shortcuts)
         KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.delete_word_backward();
         }

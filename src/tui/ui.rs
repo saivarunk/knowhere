@@ -12,20 +12,36 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),  // Query editor
+            Constraint::Length(1),  // Header
+            Constraint::Length(7),  // Query editor (increased for multiline)
             Constraint::Min(10),    // Results
             Constraint::Length(1),  // Status bar
         ])
         .split(frame.area());
 
-    draw_query_editor(frame, app, chunks[0]);
-    draw_results(frame, app, chunks[1]);
-    draw_status_bar(frame, app, chunks[2]);
+    draw_header(frame, chunks[0]);
+    draw_query_editor(frame, app, chunks[1]);
+    draw_results(frame, app, chunks[2]);
+    draw_status_bar(frame, app, chunks[3]);
 
     // Draw command line if in command mode
     if app.mode == Mode::Command {
         draw_command_line(frame, app);
     }
+}
+
+fn draw_header(frame: &mut Frame, area: Rect) {
+    let header = Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("⚡", Style::default().fg(Color::Yellow)),
+        Span::styled(" Knowhere", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+        Span::styled("SQL Explorer", Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let paragraph = Paragraph::new(header)
+        .style(Style::default().bg(Color::Black));
+    frame.render_widget(paragraph, area);
 }
 
 fn draw_query_editor(frame: &mut Frame, app: &App, area: Rect) {
@@ -37,34 +53,42 @@ fn draw_query_editor(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let block = Block::default()
-        .title(" SQL Query (i: insert, Enter: execute) ")
+        .title(" SQL Query (i: insert, :e: execute) ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Syntax highlighting for SQL
-    let highlighted = highlight_sql(&app.query);
-    let paragraph = Paragraph::new(highlighted)
+    // Syntax highlighting for SQL (multiline support)
+    let highlighted_lines = highlight_sql_multiline(&app.query);
+    let paragraph = Paragraph::new(highlighted_lines)
         .wrap(Wrap { trim: false });
 
     frame.render_widget(paragraph, inner);
 
-    // Show cursor in insert mode
+    // Show cursor in insert mode with multiline support
     if app.mode == Mode::Insert && is_focused {
-        let cursor_x = inner.x + (app.cursor_pos as u16 % inner.width);
-        let cursor_y = inner.y + (app.cursor_pos as u16 / inner.width);
+        let text_before_cursor = &app.query[..app.cursor_pos.min(app.query.len())];
+        let lines: Vec<&str> = text_before_cursor.split('\n').collect();
+        let cursor_y = inner.y + (lines.len() as u16).saturating_sub(1);
+        let cursor_x = inner.x + lines.last().map(|l| l.len()).unwrap_or(0) as u16;
         frame.set_cursor_position((cursor_x, cursor_y));
     }
 }
 
-fn highlight_sql(query: &str) -> Line<'static> {
+fn highlight_sql_multiline(query: &str) -> Vec<Line<'static>> {
+    query.split('\n').map(|line| highlight_sql_line(line)).collect()
+}
+
+fn highlight_sql_line(query: &str) -> Line<'static> {
     let keywords = [
         "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "JOIN", "INNER", "LEFT", "RIGHT",
         "OUTER", "ON", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET",
         "AS", "DISTINCT", "COUNT", "SUM", "AVG", "MIN", "MAX", "NULL", "IS", "IN", "LIKE",
         "BETWEEN", "CASE", "WHEN", "THEN", "ELSE", "END", "TRUE", "FALSE", "CROSS",
+        "WITH", "UNION", "ALL", "INTERSECT", "EXCEPT", "OVER", "PARTITION", "ROW_NUMBER",
+        "RANK", "DENSE_RANK", "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "EXISTS",
     ];
 
     let mut spans = Vec::new();
@@ -263,9 +287,9 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let help = match app.mode {
-        Mode::Normal => "i:insert  j/k:scroll  Tab:focus  ::command  q:quit",
-        Mode::Insert => "Esc:normal  Enter:execute  Ctrl+C:cancel",
-        Mode::Command => "Enter:execute  Esc:cancel",
+        Mode::Normal => "i:insert  j/k:scroll  Tab:focus  :e:execute  ::command  q:quit",
+        Mode::Insert => "Esc:normal  Enter:newline  Ctrl+C:cancel",
+        Mode::Command => "e:execute  q:quit  Esc:cancel",
     };
 
     let status = Line::from(vec![

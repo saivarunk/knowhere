@@ -20,8 +20,31 @@ ratatui = "0.28"
 crossterm = "0.28"
 clap = { version = "4", features = ["derive"] }
 thiserror = "1.0"
-snap = "1.1"
-flate2 = "1.0"
+
+# DataFusion and Arrow ecosystem
+datafusion = "37"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+arrow = "51"
+arrow-array = "51"
+arrow-schema = "51"
+parquet = "51"
+object_store = "0.9"
+
+# Delta Lake support
+deltalake = { version = "0.17", features = ["datafusion"] }
+
+# Iceberg support (commented out - not yet stable)
+# iceberg = "0.7"
+# iceberg-datafusion = "0.7"
+
+# SQLite support
+rusqlite = "0.31"
+
+# Date/time handling (pinned to avoid arrow-arith conflict)
+chrono = "=0.4.38"
+
+# Async support
+async-trait = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

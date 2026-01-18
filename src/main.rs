@@ -1,6 +1,4 @@
-use std::fs;
 use std::io::stdout;
-use std::path::Path;
 
 use crossterm::{
     execute,
@@ -9,9 +7,7 @@ use crossterm::{
 use ratatui::prelude::*;
 
 use knowhere::cli::{Cli, OutputFormat};
-use knowhere::sql::executor::{execute_query, ExecutionContext};
-use knowhere::storage::csv::CsvReader;
-use knowhere::storage::parquet::ParquetReader;
+use knowhere::datafusion::{DataFusionContext, FileLoader};
 use knowhere::storage::table::Table;
 use knowhere::tui::{app::App, input::handle_events, ui::draw};
 
@@ -32,66 +28,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn load_data(cli: &Cli) -> Result<ExecutionContext, Box<dyn std::error::Error>> {
-    let mut ctx = ExecutionContext::new();
+fn load_data(cli: &Cli) -> Result<DataFusionContext, Box<dyn std::error::Error>> {
+    let mut loader = FileLoader::new()?;
     let path = &cli.path;
 
     if path.is_file() {
-        let table = load_file(path, cli)?;
-        ctx.add_table(table);
+        loader.load_file(path)?;
     } else if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let file_path = entry.path();
-
-            if file_path.is_file() {
-                let ext = file_path.extension().and_then(|e| e.to_str());
-                match ext {
-                    Some("csv") | Some("parquet") | Some("pq") => {
-                        match load_file(&file_path, cli) {
-                            Ok(table) => ctx.add_table(table),
-                            Err(e) => eprintln!("Warning: Failed to load {}: {}", file_path.display(), e),
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        loader.load_directory(path)?;
     } else {
         return Err(format!("Path does not exist: {}", path.display()).into());
     }
 
-    if ctx.tables.is_empty() {
+    let ctx = loader.into_context();
+
+    if ctx.table_count() == 0 {
         return Err("No valid data files found".into());
     }
 
     Ok(ctx)
 }
 
-fn load_file(path: &Path, cli: &Cli) -> Result<Table, Box<dyn std::error::Error>> {
-    let ext = path.extension().and_then(|e| e.to_str());
-
-    match ext {
-        Some("csv") => {
-            let reader = CsvReader::new()
-                .with_delimiter(cli.delimiter)
-                .with_header(!cli.no_header);
-            Ok(reader.read_file(path)?)
-        }
-        Some("parquet") | Some("pq") => {
-            let reader = ParquetReader::new();
-            Ok(reader.read_file(path)?)
-        }
-        _ => Err(format!("Unsupported file format: {}", path.display()).into()),
-    }
-}
-
 fn run_query(
-    ctx: &ExecutionContext,
+    ctx: &DataFusionContext,
     query: &str,
     format: OutputFormat,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let result = execute_query(ctx, query)?;
+    let result = ctx.execute_sql(query)?;
 
     match format {
         OutputFormat::Table => print_table(&result),
@@ -197,7 +160,7 @@ fn print_json(table: &Table) {
     println!("]");
 }
 
-fn run_tui(ctx: ExecutionContext) -> Result<(), Box<dyn std::error::Error>> {
+fn run_tui(ctx: DataFusionContext) -> Result<(), Box<dyn std::error::Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = stdout();

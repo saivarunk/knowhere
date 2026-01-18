@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cargo build:*)",
       "Bash(cargo test:*)",
-      "Bash(./target/release/knowhere:*)"
+      "Bash(./target/release/knowhere:*)",
+      "Bash(head:*)",
+      "Bash(cargo clean:*)"
     ]
   }
 }
