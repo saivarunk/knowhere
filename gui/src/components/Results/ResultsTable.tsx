@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 import type { QueryResult } from '../../lib/types';
@@ -11,6 +11,11 @@ interface ResultsTableProps {
 
 export function ResultsTable({ result, error, isLoading }: ResultsTableProps) {
     const parentRef = useRef<HTMLDivElement>(null);
+    const headerScrollRef = useRef<HTMLDivElement>(null);
+
+    // Track column widths with state so they can be resized
+    const [columnWidthOverrides, setColumnWidthOverrides] = useState<Record<number, number>>({});
+    const [resizing, setResizing] = useState<{ index: number; startX: number; startWidth: number } | null>(null);
 
     const rowVirtualizer = useVirtualizer({
         count: result?.rows.length || 0,
@@ -19,21 +24,61 @@ export function ResultsTable({ result, error, isLoading }: ResultsTableProps) {
         overscan: 10,
     });
 
-    // Calculate column widths based on content
-    const columnWidths = useMemo(() => {
+    // Calculate initial column widths based on content
+    const defaultColumnWidths = useMemo(() => {
         if (!result) return [];
 
         return result.columns.map((col, colIndex) => {
-            const headerWidth = col.name.length * 8 + 24;
+            const headerWidth = col.name.length * 9 + 32;
             const maxContentWidth = result.rows.slice(0, 100).reduce((max, row) => {
                 const cellValue = row[colIndex];
                 const cellStr = cellValue === null ? 'NULL' : String(cellValue);
-                return Math.max(max, cellStr.length * 7 + 16);
+                return Math.max(max, cellStr.length * 8 + 24);
             }, 0);
 
-            return Math.min(Math.max(headerWidth, maxContentWidth, 80), 400);
+            return Math.min(Math.max(headerWidth, maxContentWidth, 100), 500);
         });
     }, [result]);
+
+    // Merge defaults with overrides
+    const columnWidths = useMemo(() => {
+        return defaultColumnWidths.map((w, i) => columnWidthOverrides[i] ?? w);
+    }, [defaultColumnWidths, columnWidthOverrides]);
+
+    // Handle resize start
+    const handleResizeStart = useCallback((e: React.MouseEvent, index: number) => {
+        e.preventDefault();
+        setResizing({
+            index,
+            startX: e.clientX,
+            startWidth: columnWidths[index],
+        });
+    }, [columnWidths]);
+
+    // Handle resize move
+    const handleResizeMove = useCallback((e: React.MouseEvent) => {
+        if (!resizing) return;
+
+        const delta = e.clientX - resizing.startX;
+        const newWidth = Math.max(60, resizing.startWidth + delta);
+
+        setColumnWidthOverrides(prev => ({
+            ...prev,
+            [resizing.index]: newWidth,
+        }));
+    }, [resizing]);
+
+    // Handle resize end
+    const handleResizeEnd = useCallback(() => {
+        setResizing(null);
+    }, []);
+
+    // Sync header scroll with body scroll
+    const handleBodyScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        if (headerScrollRef.current) {
+            headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        }
+    }, []);
 
     if (isLoading) {
         return (
@@ -79,18 +124,45 @@ export function ResultsTable({ result, error, isLoading }: ResultsTableProps) {
         );
     }
 
+    const totalWidth = columnWidths.reduce((a, b) => a + b, 0);
+
     return (
-        <div className="h-full flex flex-col">
+        <div
+            className="h-full flex flex-col select-none"
+            onMouseMove={resizing ? handleResizeMove : undefined}
+            onMouseUp={resizing ? handleResizeEnd : undefined}
+            onMouseLeave={resizing ? handleResizeEnd : undefined}
+        >
             {/* Header */}
-            <div className="flex-shrink-0 border-b bg-[color:var(--bg-secondary)] overflow-hidden">
-                <div className="flex" style={{ minWidth: columnWidths.reduce((a, b) => a + b, 0) }}>
+            <div
+                ref={headerScrollRef}
+                className="flex-shrink-0 border-b overflow-hidden"
+                style={{ backgroundColor: 'var(--bg-tertiary)' }}
+            >
+                <div className="flex" style={{ minWidth: totalWidth }}>
                     {result.columns.map((col, i) => (
                         <div
                             key={col.name}
-                            className="flex-shrink-0 px-3 py-2 text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wide border-r last:border-r-0"
+                            className="flex-shrink-0 relative group"
                             style={{ width: columnWidths[i] }}
                         >
-                            <div className="truncate">{col.name}</div>
+                            <div
+                                className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide"
+                                style={{
+                                    color: 'var(--text-secondary)',
+                                    borderRight: '1px solid var(--border)'
+                                }}
+                            >
+                                <div className="truncate">{col.name}</div>
+                            </div>
+                            {/* Resize handle */}
+                            <div
+                                className={clsx(
+                                    'absolute right-0 top-0 w-1 h-full cursor-col-resize transition-colors',
+                                    resizing?.index === i ? 'bg-blue-500' : 'hover:bg-blue-400'
+                                )}
+                                onMouseDown={(e) => handleResizeStart(e, i)}
+                            />
                         </div>
                     ))}
                 </div>
@@ -100,40 +172,44 @@ export function ResultsTable({ result, error, isLoading }: ResultsTableProps) {
             <div
                 ref={parentRef}
                 className="flex-1 overflow-auto scrollbar-thin"
+                onScroll={handleBodyScroll}
             >
                 <div
                     style={{
                         height: `${rowVirtualizer.getTotalSize()}px`,
-                        width: columnWidths.reduce((a, b) => a + b, 0),
+                        width: totalWidth,
                         position: 'relative',
                     }}
                 >
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                         const row = result.rows[virtualRow.index];
+                        const isEven = virtualRow.index % 2 === 0;
                         return (
                             <div
                                 key={virtualRow.index}
-                                className={clsx(
-                                    'flex absolute w-full border-b border-surface-100 dark:border-surface-850',
-                                    virtualRow.index % 2 === 0
-                                        ? 'bg-transparent'
-                                        : 'bg-surface-50/50 dark:bg-surface-900/50'
-                                )}
+                                className="flex absolute w-full results-row"
                                 style={{
                                     height: `${virtualRow.size}px`,
                                     transform: `translateY(${virtualRow.start}px)`,
+                                    backgroundColor: isEven ? 'var(--bg-primary)' : 'var(--bg-secondary)',
                                 }}
                             >
                                 {row.map((cell, cellIndex) => (
                                     <div
                                         key={cellIndex}
-                                        className="flex-shrink-0 px-3 py-1.5 text-sm font-mono border-r last:border-r-0 border-surface-100 dark:border-surface-850"
-                                        style={{ width: columnWidths[cellIndex] }}
+                                        className="flex-shrink-0 px-3 py-1.5 text-sm font-mono"
+                                        style={{
+                                            width: columnWidths[cellIndex],
+                                            borderRight: cellIndex < row.length - 1 ? '1px solid var(--border)' : 'none'
+                                        }}
                                     >
-                                        <span className={clsx(
-                                            'block truncate',
-                                            cell === null && 'text-[color:var(--text-muted)] italic'
-                                        )}>
+                                        <span
+                                            className="block truncate"
+                                            style={{
+                                                color: cell === null ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                fontStyle: cell === null ? 'italic' : 'normal'
+                                            }}
+                                        >
                                             {cell === null ? 'NULL' : String(cell)}
                                         </span>
                                     </div>
