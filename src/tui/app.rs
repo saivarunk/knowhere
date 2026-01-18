@@ -1,4 +1,4 @@
-use crate::sql::executor::{execute_query, ExecutionContext};
+use crate::datafusion::DataFusionContext;
 use crate::storage::table::Table;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -22,7 +22,7 @@ pub struct App {
     pub mode: Mode,
     pub focus: Focus,
     pub should_quit: bool,
-    pub ctx: ExecutionContext,
+    pub ctx: DataFusionContext,
     pub command_buffer: String,
     pub result_scroll: usize,
     pub result_horizontal_scroll: usize,
@@ -32,7 +32,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ctx: ExecutionContext) -> Self {
+    pub fn new(ctx: DataFusionContext) -> Self {
         Self {
             query: String::new(),
             cursor_pos: 0,
@@ -62,7 +62,7 @@ impl App {
         }
         self.history_index = None;
 
-        match execute_query(&self.ctx, &self.query) {
+        match self.ctx.execute_sql(&self.query) {
             Ok(table) => {
                 self.calculate_column_widths(&table);
                 self.result = Some(table);
