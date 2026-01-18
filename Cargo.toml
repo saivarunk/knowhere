@@ -28,7 +28,7 @@ arrow = "51"
 arrow-array = "51"
 arrow-schema = "51"
 parquet = "51"
-object_store = "0.9"
+object_store = "0.10"
 
 # Delta Lake support
 deltalake = { version = "0.17", features = ["datafusion"] }
