@@ -175,6 +175,57 @@ impl App {
         self.cursor_pos = pos;
     }
 
+    pub fn move_cursor_up(&mut self) {
+        // Find the start of the current line
+        let before_cursor = &self.query[..self.cursor_pos];
+        let current_line_start = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        
+        // If we're on the first line, do nothing
+        if current_line_start == 0 {
+            return;
+        }
+        
+        // Column position within current line
+        let col = self.cursor_pos - current_line_start;
+        
+        // Find the start of the previous line
+        let prev_line_end = current_line_start - 1; // position of '\n'
+        let prev_line_start = self.query[..prev_line_end].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let prev_line_len = prev_line_end - prev_line_start;
+        
+        // Move to the same column on the previous line, or end of line if shorter
+        self.cursor_pos = prev_line_start + col.min(prev_line_len);
+    }
+
+    pub fn move_cursor_down(&mut self) {
+        // Find the start of the current line
+        let before_cursor = &self.query[..self.cursor_pos];
+        let current_line_start = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        
+        // Column position within current line
+        let col = self.cursor_pos - current_line_start;
+        
+        // Find the end of the current line (position of '\n' or end of string)
+        let current_line_end = self.query[self.cursor_pos..].find('\n')
+            .map(|i| self.cursor_pos + i)
+            .unwrap_or(self.query.len());
+        
+        // If we're on the last line, do nothing
+        if current_line_end == self.query.len() {
+            return;
+        }
+        
+        // Next line starts after the '\n'
+        let next_line_start = current_line_end + 1;
+        let next_line_end = self.query[next_line_start..].find('\n')
+            .map(|i| next_line_start + i)
+            .unwrap_or(self.query.len());
+        let next_line_len = next_line_end - next_line_start;
+        
+        // Move to the same column on the next line, or end of line if shorter
+        self.cursor_pos = next_line_start + col.min(next_line_len);
+    }
+
     pub fn delete_word_backward(&mut self) {
         let start = self.cursor_pos;
         self.move_cursor_word_backward();
@@ -294,6 +345,7 @@ impl App {
         let cmd = self.command_buffer.trim();
         match cmd {
             "q" | "quit" => self.should_quit = true,
+            "e" | "exec" | "execute" => self.execute_query(),
             "w" | "write" => {
                 // Could add export functionality here
             }
