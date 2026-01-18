@@ -1,14 +1,14 @@
-import { useState, useCallback, useRef } from 'react';
-import { FolderOpen, Play, RefreshCw, GripHorizontal } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { FolderOpen, Play, RefreshCw, GripHorizontal, Save, FileText, Clock, ChevronDown } from 'lucide-react';
+import { open, save } from '@tauri-apps/plugin-dialog';
 
 import { Sidebar } from './components/Sidebar';
 import { SqlEditor } from './components/Editor';
 import { ResultsTable } from './components/Results';
 import { StatusBar } from './components/StatusBar';
 import { useTheme } from './hooks/useTheme';
-import { loadPath, executeSql } from './lib/api';
-import type { QueryResult } from './lib/types';
+import { loadPath, executeSql, getQueriesDirectory, saveQuery, loadQuery, getRecentQueries } from './lib/api';
+import type { QueryResult, RecentQuery } from './lib/types';
 
 function App() {
   const { theme, toggleTheme } = useTheme();
@@ -23,9 +23,28 @@ function App() {
   const [loadingPath, setLoadingPath] = useState(false);
 
   // Resizable split pane
-  const [editorHeight, setEditorHeight] = useState(40); // percentage
+  const [editorHeight, setEditorHeight] = useState(40);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Recent queries
+  const [recentQueries, setRecentQueries] = useState<RecentQuery[]>([]);
+  const [showRecentDropdown, setShowRecentDropdown] = useState(false);
+  const [currentQueryPath, setCurrentQueryPath] = useState<string | null>(null);
+
+  // Load recent queries on mount
+  useEffect(() => {
+    loadRecentQueries();
+  }, []);
+
+  const loadRecentQueries = async () => {
+    try {
+      const queries = await getRecentQueries();
+      setRecentQueries(queries);
+    } catch (err) {
+      console.error('Failed to load recent queries:', err);
+    }
+  };
 
   const handleOpenFolder = useCallback(async () => {
     try {
@@ -81,6 +100,67 @@ function App() {
     }
   }, []);
 
+  const handleOpenQuery = useCallback(async () => {
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: 'Open SQL Query',
+        filters: [
+          { name: 'SQL Files', extensions: ['sql'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+
+      if (selected) {
+        const sql = await loadQuery(selected);
+        setQuery(sql);
+        setCurrentQueryPath(selected);
+        await loadRecentQueries();
+      }
+    } catch (err) {
+      console.error('Failed to open query:', err);
+      setError(String(err));
+    }
+  }, []);
+
+  const handleSaveQuery = useCallback(async () => {
+    try {
+      const defaultDir = await getQueriesDirectory();
+
+      const selected = await save({
+        title: 'Save SQL Query',
+        defaultPath: currentQueryPath || `${defaultDir}/query.sql`,
+        filters: [
+          { name: 'SQL Files', extensions: ['sql'] },
+        ],
+      });
+
+      if (selected) {
+        const name = selected.split('/').pop()?.replace('.sql', '') || 'Untitled';
+        await saveQuery(selected, query, name);
+        setCurrentQueryPath(selected);
+        await loadRecentQueries();
+      }
+    } catch (err) {
+      console.error('Failed to save query:', err);
+      setError(String(err));
+    }
+  }, [query, currentQueryPath]);
+
+  const handleLoadRecentQuery = useCallback(async (recentQuery: RecentQuery) => {
+    try {
+      const sql = await loadQuery(recentQuery.path);
+      setQuery(sql);
+      setCurrentQueryPath(recentQuery.path);
+      setShowRecentDropdown(false);
+      await loadRecentQueries();
+    } catch (err) {
+      console.error('Failed to load recent query:', err);
+      setError(String(err));
+    }
+  }, []);
+
   const handleExecute = useCallback(async () => {
     if (!query.trim() || isExecuting) return;
 
@@ -124,7 +204,6 @@ function App() {
     const y = e.clientY - rect.top;
     const percentage = (y / rect.height) * 100;
 
-    // Clamp between 15% and 85%
     setEditorHeight(Math.min(85, Math.max(15, percentage)));
   }, [isDragging]);
 
@@ -134,10 +213,16 @@ function App() {
 
   const isLoaded = tables.length > 0;
 
+  const formatTimestamp = (ts: number) => {
+    const date = new Date(ts * 1000);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[color:var(--bg-primary)]">
       {/* Toolbar */}
       <div className="h-11 flex items-center gap-2 px-3 border-b bg-[color:var(--bg-secondary)]">
+        {/* Data Files */}
         <button
           onClick={handleOpenFile}
           disabled={loadingPath}
@@ -154,6 +239,79 @@ function App() {
           <FolderOpen size={14} />
           Open Folder
         </button>
+
+        <div className="w-px h-5 bg-[color:var(--border)] mx-1" />
+
+        {/* Query Files */}
+        <button
+          onClick={handleOpenQuery}
+          className="btn btn-secondary text-xs gap-1.5"
+        >
+          <FileText size={14} />
+          Open Query
+        </button>
+        <button
+          onClick={handleSaveQuery}
+          className="btn btn-secondary text-xs gap-1.5"
+        >
+          <Save size={14} />
+          Save Query
+        </button>
+
+        {/* Recent Queries Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowRecentDropdown(!showRecentDropdown)}
+            className="btn btn-secondary text-xs gap-1"
+          >
+            <Clock size={14} />
+            Recent
+            <ChevronDown size={12} />
+          </button>
+
+          {showRecentDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowRecentDropdown(false)}
+              />
+              <div
+                className="absolute top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto rounded-lg shadow-lg z-20"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                {recentQueries.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+                    No recent queries
+                  </div>
+                ) : (
+                  recentQueries.map((rq, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleLoadRecentQuery(rq)}
+                      className="w-full text-left px-3 py-2 hover:bg-[color:var(--bg-tertiary)] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText size={14} style={{ color: 'var(--text-muted)' }} />
+                        <span className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                          {rq.name}
+                        </span>
+                      </div>
+                      <div className="ml-6 text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                        {rq.sql}
+                      </div>
+                      <div className="ml-6 text-2xs" style={{ color: 'var(--text-muted)' }}>
+                        {formatTimestamp(rq.timestamp)}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {loadingPath && (
           <div className="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">

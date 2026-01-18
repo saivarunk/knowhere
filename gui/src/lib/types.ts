@@ -14,4 +14,11 @@ export interface TableInfo {
     columns: ColumnInfo[];
 }
 
+export interface RecentQuery {
+    name: string;
+    path: string;
+    sql: string;
+    timestamp: number;
+}
+
 export type Theme = 'light' | 'dark';

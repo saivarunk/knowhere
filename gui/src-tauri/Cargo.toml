@@ -34,3 +34,6 @@ knowhere = { path = "../.." }
 
 # Async runtime (needed for DataFusion)
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync"] }
+
+# Cross-platform directories
+dirs = "5"

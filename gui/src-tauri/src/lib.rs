@@ -15,6 +15,11 @@ pub fn run() {
             commands::list_tables,
             commands::get_schema,
             commands::get_table_preview,
+            commands::get_queries_directory,
+            commands::save_query,
+            commands::load_query,
+            commands::get_recent_queries,
+            commands::clear_recent_queries,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
