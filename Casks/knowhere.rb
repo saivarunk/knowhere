@@ -1,5 +1,5 @@
 cask "knowhere" do
-  version "0.1.0"
+  version "0.1.1"
   sha256 "PLACEHOLDER_SHA256"
   
   url "https://github.com/saivarunk/knowhere/releases/download/v#{version}/Knowhere_#{version}_universal.dmg"

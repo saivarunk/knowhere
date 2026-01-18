@@ -1,6 +1,6 @@
 [package]
 name = "knowhere"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A lightweight SQL engine for querying CSV and Parquet files via an interactive TUI"
 license = "MIT"

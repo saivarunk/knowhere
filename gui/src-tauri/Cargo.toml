@@ -1,6 +1,6 @@
 [package]
 name = "knowhere-gui"
-version = "0.1.0"
+version = "0.1.1"
 description = "Knowhere GUI - SQL engine for querying CSV, Parquet, Delta Lake files"
 authors = ["Varun"]
 license = "MIT"
