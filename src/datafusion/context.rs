@@ -26,7 +26,7 @@ impl DataFusionContext {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .map_err(|e| DataFusionError::Io(e))?,
+                .map_err(DataFusionError::Io)?,
         );
 
         let session_config = SessionConfig::new()
@@ -113,7 +113,7 @@ impl DataFusionContext {
 
         self.runtime.block_on(async {
             let metadata_path =
-                find_iceberg_metadata(path_str).map_err(|e| DataFusionError::Iceberg(e))?;
+                find_iceberg_metadata(path_str).map_err(DataFusionError::Iceberg)?;
 
             let sql = format!(
                 "CREATE EXTERNAL TABLE {} STORED AS ICEBERG LOCATION '{}'",
@@ -214,7 +214,7 @@ fn find_iceberg_metadata(table_path: &str) -> std::result::Result<String, String
             let name = file_name.to_string_lossy();
             if name.starts_with('v') && name.ends_with(".metadata.json") {
                 if let Ok(v) = name[1..name.len() - ".metadata.json".len()].parse::<i64>() {
-                    if best_version.as_ref().map_or(true, |(bv, _)| v > *bv) {
+                    if best_version.as_ref().is_none_or(|(bv, _)| v > *bv) {
                         best_version = Some((v, entry.path()));
                     }
                 }

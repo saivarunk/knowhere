@@ -178,8 +178,8 @@ impl SqliteTableProvider {
 
         let arrays: Vec<ArrayRef> = builders.iter_mut().map(|b| b.finish()).collect();
 
-        let batch = RecordBatch::try_new(self.schema.clone(), arrays)
-            .map_err(|e| DataFusionError::Arrow(e))?;
+        let batch =
+            RecordBatch::try_new(self.schema.clone(), arrays).map_err(DataFusionError::Arrow)?;
 
         Ok(vec![batch])
     }

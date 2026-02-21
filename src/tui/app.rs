@@ -154,9 +154,7 @@ impl App {
         let chars: Vec<char> = self.query.chars().collect();
         let mut pos = self.cursor_pos;
 
-        if pos > 0 {
-            pos -= 1;
-        }
+        pos = pos.saturating_sub(1);
 
         // Skip whitespace
         while pos > 0 && chars[pos].is_whitespace() {

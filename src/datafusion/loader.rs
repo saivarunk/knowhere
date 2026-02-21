@@ -52,16 +52,12 @@ impl FileLoader {
                 Ok(vec![table_name])
             }
             FileFormat::Sqlite => self.context.register_sqlite(path),
-            FileFormat::Delta => {
-                return Err(DataFusionError::UnsupportedFormat(
-                    "Delta Lake tables must be directories".to_string(),
-                ));
-            }
-            FileFormat::Iceberg => {
-                return Err(DataFusionError::UnsupportedFormat(
-                    "Iceberg tables must be directories".to_string(),
-                ));
-            }
+            FileFormat::Delta => Err(DataFusionError::UnsupportedFormat(
+                "Delta Lake tables must be directories".to_string(),
+            )),
+            FileFormat::Iceberg => Err(DataFusionError::UnsupportedFormat(
+                "Iceberg tables must be directories".to_string(),
+            )),
         }
     }
 
