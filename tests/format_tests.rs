@@ -235,8 +235,18 @@ fn create_delta_sample(path: &str) {
         let ops = DeltaOps::try_from_uri(path).await.unwrap();
         let table = ops
             .create()
-            .with_column("id", DeltaDataType::Primitive(PrimitiveType::Long), false, None)
-            .with_column("name", DeltaDataType::Primitive(PrimitiveType::String), true, None)
+            .with_column(
+                "id",
+                DeltaDataType::Primitive(PrimitiveType::Long),
+                false,
+                None,
+            )
+            .with_column(
+                "name",
+                DeltaDataType::Primitive(PrimitiveType::String),
+                true,
+                None,
+            )
             .with_column(
                 "department",
                 DeltaDataType::Primitive(PrimitiveType::String),
@@ -257,7 +267,11 @@ fn create_delta_sample(path: &str) {
             vec![
                 Arc::new(Int64Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["Alice", "Bob", "Charlie"])),
-                Arc::new(StringArray::from(vec!["Engineering", "Marketing", "Engineering"])),
+                Arc::new(StringArray::from(vec![
+                    "Engineering",
+                    "Marketing",
+                    "Engineering",
+                ])),
             ],
         )
         .unwrap();
@@ -276,7 +290,11 @@ fn test_load_delta_table() {
 
     let mut loader = FileLoader::new().expect("Failed to create loader");
     let result = loader.load_directory(&table_path);
-    assert!(result.is_ok(), "Failed to load Delta table: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to load Delta table: {:?}",
+        result.err()
+    );
 
     let tables = result.unwrap();
     assert_eq!(tables.len(), 1);

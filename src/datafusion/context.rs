@@ -56,9 +56,9 @@ impl DataFusionContext {
 
     pub fn register_csv(&mut self, name: impl Into<String>, path: &Path) -> Result<()> {
         let name = name.into();
-        let path_str = path.to_str().ok_or_else(|| {
-            DataFusionError::Conversion("Invalid UTF-8 in path".to_string())
-        })?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| DataFusionError::Conversion("Invalid UTF-8 in path".to_string()))?;
 
         self.runtime.block_on(async {
             let ctx = &self.session;
@@ -73,9 +73,9 @@ impl DataFusionContext {
 
     pub fn register_parquet(&mut self, name: impl Into<String>, path: &Path) -> Result<()> {
         let name = name.into();
-        let path_str = path.to_str().ok_or_else(|| {
-            DataFusionError::Conversion("Invalid UTF-8 in path".to_string())
-        })?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| DataFusionError::Conversion("Invalid UTF-8 in path".to_string()))?;
 
         self.runtime.block_on(async {
             let ctx = &self.session;
@@ -90,9 +90,9 @@ impl DataFusionContext {
 
     pub fn register_delta(&mut self, name: impl Into<String>, path: &Path) -> Result<()> {
         let name = name.into();
-        let path_str = path.to_str().ok_or_else(|| {
-            DataFusionError::Conversion("Invalid UTF-8 in path".to_string())
-        })?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| DataFusionError::Conversion("Invalid UTF-8 in path".to_string()))?;
 
         self.runtime.block_on(async {
             let delta_table = deltalake::open_table(path_str).await?;
@@ -107,13 +107,13 @@ impl DataFusionContext {
 
     pub fn register_iceberg(&mut self, name: impl Into<String>, path: &Path) -> Result<()> {
         let name = name.into();
-        let path_str = path.to_str().ok_or_else(|| {
-            DataFusionError::Conversion("Invalid UTF-8 in path".to_string())
-        })?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| DataFusionError::Conversion("Invalid UTF-8 in path".to_string()))?;
 
         self.runtime.block_on(async {
-            let metadata_path = find_iceberg_metadata(path_str)
-                .map_err(|e| DataFusionError::Iceberg(e))?;
+            let metadata_path =
+                find_iceberg_metadata(path_str).map_err(|e| DataFusionError::Iceberg(e))?;
 
             let sql = format!(
                 "CREATE EXTERNAL TABLE {} STORED AS ICEBERG LOCATION '{}'",
@@ -173,7 +173,7 @@ impl DataFusionContext {
 
     pub fn get_table_schema(&self, table_name: &str) -> Option<crate::storage::table::Schema> {
         use super::conversion::convert_schema;
-        
+
         self.runtime.block_on(async {
             let provider = self.session.table_provider(table_name).await.ok()?;
             let arrow_schema = provider.schema();
@@ -185,7 +185,10 @@ impl DataFusionContext {
 fn find_iceberg_metadata(table_path: &str) -> std::result::Result<String, String> {
     let metadata_dir = Path::new(table_path).join("metadata");
     if !metadata_dir.is_dir() {
-        return Err(format!("No metadata directory found at {}", metadata_dir.display()));
+        return Err(format!(
+            "No metadata directory found at {}",
+            metadata_dir.display()
+        ));
     }
 
     // Try version-hint.text first

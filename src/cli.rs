@@ -3,7 +3,11 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "knowhere")]
-#[command(author, version, about = "A lightweight SQL engine for querying CSV and Parquet files")]
+#[command(
+    author,
+    version,
+    about = "A lightweight SQL engine for querying CSV and Parquet files"
+)]
 pub struct Cli {
     /// Path to a CSV/Parquet file or folder containing data files
     #[arg(required = true)]

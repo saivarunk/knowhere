@@ -1,5 +1,5 @@
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder, BinaryBuilder,
+    ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
 };
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
 use arrow::record_batch::RecordBatch;
@@ -121,10 +121,7 @@ impl SqliteTableProvider {
         while let Some(row) = rows.next()? {
             for (i, builder) in builders.iter_mut().enumerate() {
                 if let ArrowDataType::Int64 = self.schema.field(i).data_type() {
-                    let b = builder
-                        .as_any_mut()
-                        .downcast_mut::<Int64Builder>()
-                        .unwrap();
+                    let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
                     match row.get_ref(i)? {
                         rusqlite::types::ValueRef::Null => b.append_null(),
                         rusqlite::types::ValueRef::Integer(v) => b.append_value(v),
@@ -162,7 +159,10 @@ impl SqliteTableProvider {
                         _ => b.append_null(),
                     }
                 } else {
-                    let b = builder.as_any_mut().downcast_mut::<StringBuilder>().unwrap();
+                    let b = builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .unwrap();
                     match row.get_ref(i)? {
                         rusqlite::types::ValueRef::Null => b.append_null(),
                         rusqlite::types::ValueRef::Integer(v) => b.append_value(v.to_string()),
@@ -176,10 +176,7 @@ impl SqliteTableProvider {
             }
         }
 
-        let arrays: Vec<ArrayRef> = builders
-            .iter_mut()
-            .map(|b| b.finish())
-            .collect();
+        let arrays: Vec<ArrayRef> = builders.iter_mut().map(|b| b.finish()).collect();
 
         let batch = RecordBatch::try_new(self.schema.clone(), arrays)
             .map_err(|e| DataFusionError::Arrow(e))?;
@@ -209,11 +206,12 @@ impl TableProvider for SqliteTableProvider {
         _filters: &[datafusion::prelude::Expr],
         _limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let batches = self.read_table_data().map_err(|e| {
-            DFError::External(Box::new(e))
-        })?;
+        let batches = self
+            .read_table_data()
+            .map_err(|e| DFError::External(Box::new(e)))?;
 
-        let exec = MemorySourceConfig::try_new_exec(&[batches], self.schema.clone(), projection.cloned())?;
+        let exec =
+            MemorySourceConfig::try_new_exec(&[batches], self.schema.clone(), projection.cloned())?;
 
         Ok(exec)
     }

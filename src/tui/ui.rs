@@ -12,10 +12,10 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),  // Header
-            Constraint::Length(7),  // Query editor (increased for multiline)
-            Constraint::Min(10),    // Results
-            Constraint::Length(1),  // Status bar
+            Constraint::Length(1), // Header
+            Constraint::Length(7), // Query editor (increased for multiline)
+            Constraint::Min(10),   // Results
+            Constraint::Length(1), // Status bar
         ])
         .split(frame.area());
 
@@ -34,13 +34,17 @@ fn draw_header(frame: &mut Frame, area: Rect) {
     let header = Line::from(vec![
         Span::styled("  ", Style::default()),
         Span::styled("⚡", Style::default().fg(Color::Yellow)),
-        Span::styled(" Knowhere", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " Knowhere",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" | ", Style::default().fg(Color::DarkGray)),
         Span::styled("SQL Explorer", Style::default().fg(Color::DarkGray)),
     ]);
 
-    let paragraph = Paragraph::new(header)
-        .style(Style::default().bg(Color::Black));
+    let paragraph = Paragraph::new(header).style(Style::default().bg(Color::Black));
     frame.render_widget(paragraph, area);
 }
 
@@ -62,8 +66,7 @@ fn draw_query_editor(frame: &mut Frame, app: &App, area: Rect) {
 
     // Syntax highlighting for SQL (multiline support)
     let highlighted_lines = highlight_sql_multiline(&app.query);
-    let paragraph = Paragraph::new(highlighted_lines)
-        .wrap(Wrap { trim: false });
+    let paragraph = Paragraph::new(highlighted_lines).wrap(Wrap { trim: false });
 
     frame.render_widget(paragraph, inner);
 
@@ -78,17 +81,69 @@ fn draw_query_editor(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn highlight_sql_multiline(query: &str) -> Vec<Line<'static>> {
-    query.split('\n').map(|line| highlight_sql_line(line)).collect()
+    query
+        .split('\n')
+        .map(|line| highlight_sql_line(line))
+        .collect()
 }
 
 fn highlight_sql_line(query: &str) -> Line<'static> {
     let keywords = [
-        "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "JOIN", "INNER", "LEFT", "RIGHT",
-        "OUTER", "ON", "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET",
-        "AS", "DISTINCT", "COUNT", "SUM", "AVG", "MIN", "MAX", "NULL", "IS", "IN", "LIKE",
-        "BETWEEN", "CASE", "WHEN", "THEN", "ELSE", "END", "TRUE", "FALSE", "CROSS",
-        "WITH", "UNION", "ALL", "INTERSECT", "EXCEPT", "OVER", "PARTITION", "ROW_NUMBER",
-        "RANK", "DENSE_RANK", "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "EXISTS",
+        "SELECT",
+        "FROM",
+        "WHERE",
+        "AND",
+        "OR",
+        "NOT",
+        "JOIN",
+        "INNER",
+        "LEFT",
+        "RIGHT",
+        "OUTER",
+        "ON",
+        "GROUP",
+        "BY",
+        "HAVING",
+        "ORDER",
+        "ASC",
+        "DESC",
+        "LIMIT",
+        "OFFSET",
+        "AS",
+        "DISTINCT",
+        "COUNT",
+        "SUM",
+        "AVG",
+        "MIN",
+        "MAX",
+        "NULL",
+        "IS",
+        "IN",
+        "LIKE",
+        "BETWEEN",
+        "CASE",
+        "WHEN",
+        "THEN",
+        "ELSE",
+        "END",
+        "TRUE",
+        "FALSE",
+        "CROSS",
+        "WITH",
+        "UNION",
+        "ALL",
+        "INTERSECT",
+        "EXCEPT",
+        "OVER",
+        "PARTITION",
+        "ROW_NUMBER",
+        "RANK",
+        "DENSE_RANK",
+        "LAG",
+        "LEAD",
+        "FIRST_VALUE",
+        "LAST_VALUE",
+        "EXISTS",
     ];
 
     let mut spans = Vec::new();
@@ -208,8 +263,11 @@ fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
             .skip(app.result_horizontal_scroll)
             .map(|(i, col)| {
                 let width = app.column_widths.get(i).copied().unwrap_or(10);
-                Cell::from(truncate_string(&col.name, width))
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                Cell::from(truncate_string(&col.name, width)).style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
             })
             .collect();
 
@@ -321,8 +379,8 @@ fn draw_command_line(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let command_line = Paragraph::new(format!(":{}", app.command_buffer))
-        .style(Style::default().fg(Color::White));
+    let command_line =
+        Paragraph::new(format!(":{}", app.command_buffer)).style(Style::default().fg(Color::White));
 
     frame.render_widget(command_line, popup_area);
 
