@@ -1,0 +1,5 @@
+{"id": 1, "name": "Alice", "address": {"city": "San Francisco", "country": "US"}, "skills": ["Rust", "Python", "SQL"]}
+{"id": 2, "name": "Bob", "address": {"city": "London", "country": "UK"}, "skills": ["JavaScript", "TypeScript"]}
+{"id": 3, "name": "Charlie", "address": {"city": "New York", "country": "US"}, "skills": ["Go", "Rust", "C++"]}
+{"id": 4, "name": "Diana", "address": {"city": "Berlin", "country": "DE"}, "skills": ["Python", "R", "SQL"]}
+{"id": 5, "name": "Eve", "address": {"city": "Austin", "country": "US"}, "skills": ["Rust", "C"]}

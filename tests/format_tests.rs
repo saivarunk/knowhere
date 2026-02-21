@@ -339,6 +339,144 @@ fn test_json_detection() {
 }
 
 // ---------------------------------------------------------------------------
+// Nested JSON tests
+// ---------------------------------------------------------------------------
+
+// employees_nested.json schema:
+//   id INT64, name STRING,
+//   address STRUCT<city STRING, country STRING>,
+//   skills LIST<STRING>
+
+#[test]
+fn test_json_nested_struct_load() {
+    // Verify the NDJSON reader infers nested objects as Struct columns.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let json_file = get_samples_dir().join("employees_nested.json");
+
+    let result = loader.load_file(&json_file);
+    assert!(
+        result.is_ok(),
+        "Failed to load nested JSON: {:?}",
+        result.err()
+    );
+
+    let ctx = loader.into_context();
+    let schema = ctx.get_table_schema("employees_nested");
+    assert!(schema.is_some(), "Schema should be available");
+
+    // Should have 4 columns: id, name, address (struct), skills (list)
+    let schema = schema.unwrap();
+    assert_eq!(schema.columns.len(), 4);
+
+    let all_rows = ctx.execute_sql("SELECT * FROM employees_nested");
+    assert!(
+        all_rows.is_ok(),
+        "SELECT * failed: {:?}",
+        all_rows.err()
+    );
+    assert_eq!(all_rows.unwrap().row_count(), 5);
+}
+
+#[test]
+fn test_json_nested_struct_field_access() {
+    // Access a nested struct field using get_field().
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT name, get_field(address, 'city') AS city \
+         FROM employees_nested \
+         ORDER BY name",
+    );
+    assert!(
+        result.is_ok(),
+        "Struct field access failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    assert_eq!(table.row_count(), 5);
+    assert_eq!(table.column_count(), 2);
+}
+
+#[test]
+fn test_json_nested_struct_filter() {
+    // Filter on a nested struct field — only US-based employees.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT name, get_field(address, 'city') AS city \
+         FROM employees_nested \
+         WHERE get_field(address, 'country') = 'US' \
+         ORDER BY name",
+    );
+    assert!(
+        result.is_ok(),
+        "Struct filter failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    // Alice (US), Charlie (US), Eve (US) → 3 rows
+    assert_eq!(table.row_count(), 3);
+}
+
+#[test]
+fn test_json_unnest_array() {
+    // Explode the skills array — each row becomes one row per skill.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT id, name, unnest(skills) AS skill \
+         FROM employees_nested \
+         ORDER BY id, skill",
+    );
+    assert!(
+        result.is_ok(),
+        "unnest(skills) failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    // Alice:3, Bob:2, Charlie:3, Diana:3, Eve:2 → 13 total skill rows
+    assert_eq!(table.row_count(), 13);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_json_unnest_with_filter() {
+    // Unnest skills and filter to find all employees who know Rust.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT DISTINCT name \
+         FROM (SELECT id, name, unnest(skills) AS skill FROM employees_nested) \
+         WHERE skill = 'Rust' \
+         ORDER BY name",
+    );
+    assert!(
+        result.is_ok(),
+        "unnest + filter failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    // Alice, Charlie, Eve know Rust → 3 distinct names
+    assert_eq!(table.row_count(), 3);
+}
+
+// ---------------------------------------------------------------------------
 // Delta Lake tests
 // ---------------------------------------------------------------------------
 
