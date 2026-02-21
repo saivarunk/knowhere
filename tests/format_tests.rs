@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -5,6 +6,11 @@ use arrow_array::{Int64Array, StringArray};
 use arrow_schema::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
 use deltalake::kernel::{DataType as DeltaDataType, PrimitiveType};
 use deltalake::DeltaOps;
+use iceberg::memory::{MemoryCatalogBuilder, MEMORY_CATALOG_WAREHOUSE};
+use iceberg::spec::{
+    NestedField, PrimitiveType as IcebergPrimitive, Schema as IcebergSchema, Type,
+};
+use iceberg::{Catalog, CatalogBuilder, NamespaceIdent, TableCreation};
 use knowhere::datafusion::FileLoader;
 
 fn get_samples_dir() -> PathBuf {
@@ -367,5 +373,127 @@ fn test_delta_detection_requires_delta_log() {
     assert!(
         result.is_err(),
         "Expected error for empty non-delta directory"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Iceberg tests
+// ---------------------------------------------------------------------------
+
+/// Create a minimal Iceberg table at `table_dir` using MemoryCatalog backed
+/// by the local filesystem. MemoryCatalog writes a real metadata JSON file,
+/// which register_iceberg() can then locate and register with DataFusion.
+fn create_iceberg_sample(table_dir: &std::path::Path) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let warehouse = table_dir.parent().unwrap().to_str().unwrap().to_string();
+        let table_name = table_dir.file_name().unwrap().to_str().unwrap().to_string();
+
+        let catalog = MemoryCatalogBuilder::default()
+            .load(
+                "local",
+                HashMap::from([(MEMORY_CATALOG_WAREHOUSE.to_string(), warehouse)]),
+            )
+            .await
+            .unwrap();
+
+        let ns = NamespaceIdent::new("default".to_string());
+        catalog.create_namespace(&ns, HashMap::new()).await.unwrap();
+
+        let schema = IcebergSchema::builder()
+            .with_fields(vec![
+                NestedField::required(1, "id", Type::Primitive(IcebergPrimitive::Long)).into(),
+                NestedField::optional(2, "name", Type::Primitive(IcebergPrimitive::String)).into(),
+                NestedField::optional(3, "department", Type::Primitive(IcebergPrimitive::String))
+                    .into(),
+            ])
+            .build()
+            .unwrap();
+
+        let creation = TableCreation::builder()
+            .name(table_name)
+            .location(table_dir.to_str().unwrap().to_string())
+            .schema(schema)
+            .build();
+
+        catalog.create_table(&ns, creation).await.unwrap();
+    });
+}
+
+#[test]
+fn test_load_iceberg_table() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_iceberg");
+
+    create_iceberg_sample(&table_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let result = loader.load_directory(&table_path);
+    assert!(
+        result.is_ok(),
+        "Failed to load Iceberg table: {:?}",
+        result.err()
+    );
+
+    let tables = result.unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0], "employees_iceberg");
+}
+
+#[test]
+fn test_iceberg_schema_inference() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_iceberg");
+
+    create_iceberg_sample(&table_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_directory(&table_path).unwrap();
+    let ctx = loader.into_context();
+
+    // Schema should have the 3 columns defined in create_iceberg_sample
+    let schema = ctx.get_table_schema("employees_iceberg");
+    assert!(schema.is_some(), "Schema should be available after loading");
+    let schema = schema.unwrap();
+    assert_eq!(schema.columns.len(), 3);
+    assert_eq!(schema.columns[0].name, "id");
+    assert_eq!(schema.columns[1].name, "name");
+    assert_eq!(schema.columns[2].name, "department");
+}
+
+#[test]
+fn test_iceberg_empty_table_query() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_iceberg");
+
+    create_iceberg_sample(&table_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_directory(&table_path).unwrap();
+    let ctx = loader.into_context();
+
+    // Table has no data files yet — query should return 0 rows without error
+    let result = ctx.execute_sql("SELECT * FROM employees_iceberg");
+    assert!(
+        result.is_ok(),
+        "Query on empty Iceberg table failed: {:?}",
+        result.err()
+    );
+    assert_eq!(result.unwrap().row_count(), 0);
+}
+
+#[test]
+fn test_iceberg_detection_requires_metadata_dir() {
+    // A directory without a metadata/ subdirectory must NOT be detected as
+    // Iceberg, so load_directory should fall through and fail on the empty dir.
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let plain_dir = tmp_dir.path().join("not_an_iceberg_table");
+    std::fs::create_dir_all(&plain_dir).unwrap();
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let result = loader.load_directory(&plain_dir);
+    assert!(
+        result.is_err(),
+        "Expected error for empty non-iceberg directory"
     );
 }

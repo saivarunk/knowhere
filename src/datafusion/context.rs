@@ -206,17 +206,29 @@ fn find_iceberg_metadata(table_path: &str) -> std::result::Result<String, String
         }
     }
 
-    // Fall back to finding the highest versioned metadata file
+    // Fall back to finding the highest versioned metadata file.
+    // Supports two naming conventions:
+    //   Legacy : v{n}.metadata.json          (e.g. v1.metadata.json)
+    //   Modern : {n:05}-{uuid}.metadata.json (e.g. 00000-<uuid>.metadata.json)
     let mut best_version: Option<(i64, std::path::PathBuf)> = None;
     if let Ok(entries) = std::fs::read_dir(&metadata_dir) {
         for entry in entries.flatten() {
             let file_name = entry.file_name();
             let name = file_name.to_string_lossy();
-            if name.starts_with('v') && name.ends_with(".metadata.json") {
-                if let Ok(v) = name[1..name.len() - ".metadata.json".len()].parse::<i64>() {
-                    if best_version.as_ref().is_none_or(|(bv, _)| v > *bv) {
-                        best_version = Some((v, entry.path()));
-                    }
+            let version = if name.starts_with('v') && name.ends_with(".metadata.json") {
+                // Legacy: v{n}.metadata.json
+                name[1..name.len() - ".metadata.json".len()]
+                    .parse::<i64>()
+                    .ok()
+            } else if name.ends_with(".metadata.json") {
+                // Modern: {n}-{uuid}.metadata.json — take the numeric prefix
+                name.split('-').next().and_then(|n| n.parse::<i64>().ok())
+            } else {
+                None
+            };
+            if let Some(v) = version {
+                if best_version.as_ref().is_none_or(|(bv, _)| v > *bv) {
+                    best_version = Some((v, entry.path()));
                 }
             }
         }
