@@ -327,6 +327,29 @@ fn test_json_join_with_csv() {
 }
 
 #[test]
+fn test_json_string_values_readable() {
+    // Regression: DataFusion's JSON reader infers strings as LargeUtf8.
+    // conversion.rs must handle LargeUtf8, otherwise every string cell is
+    // rendered as a debug-printed ArrayRef instead of the actual value.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("products.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx
+        .execute_sql("SELECT name, category FROM products ORDER BY id LIMIT 1")
+        .unwrap();
+
+    assert_eq!(result.row_count(), 1);
+    let name_val = result.rows[0].values[0].to_string();
+    let cat_val = result.rows[0].values[1].to_string();
+    // Must be the actual string, not a debug dump like "LargeStringArray[...]"
+    assert_eq!(name_val, "Laptop Pro");
+    assert_eq!(cat_val, "Electronics");
+}
+
+#[test]
 fn test_json_detection() {
     // Verify all three recognised JSON extensions are detected correctly.
     let mut loader = FileLoader::new().expect("Failed to create loader");

@@ -1,8 +1,9 @@
 use arrow::array::{
     Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Float32Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMicrosecondArray,
-    TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array,
-    UInt32Array, UInt64Array, UInt8Array,
+    Int16Array, Int32Array, Int64Array, Int8Array, LargeListArray, LargeStringArray, ListArray,
+    StringArray, StructArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+    TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
+    UInt8Array,
 };
 use arrow::datatypes::{DataType as ArrowDataType, TimeUnit};
 use arrow::record_batch::RecordBatch;
@@ -130,6 +131,58 @@ fn convert_array_value(array: &ArrayRef, index: usize) -> Result<Value> {
         ArrowDataType::Utf8 => {
             let arr = array.as_any().downcast_ref::<StringArray>().unwrap();
             Value::String(arr.value(index).to_string())
+        }
+        // DataFusion's JSON reader infers strings as LargeUtf8
+        ArrowDataType::LargeUtf8 => {
+            let arr = array.as_any().downcast_ref::<LargeStringArray>().unwrap();
+            Value::String(arr.value(index).to_string())
+        }
+        // Nested JSON objects → Struct; render as a compact JSON object string
+        ArrowDataType::Struct(fields) => {
+            let arr = array.as_any().downcast_ref::<StructArray>().unwrap();
+            let fields = fields.clone();
+            let parts: Vec<String> = fields
+                .iter()
+                .enumerate()
+                .filter_map(|(i, field)| {
+                    let child = arr.column(i);
+                    convert_array_value(child, index).ok().map(|v| {
+                        let rendered = match &v {
+                            Value::String(s) => format!("\"{}\"", s),
+                            _ => v.to_string(),
+                        };
+                        format!("\"{}\":{}", field.name(), rendered)
+                    })
+                })
+                .collect();
+            Value::String(format!("{{{}}}", parts.join(",")))
+        }
+        // Nested JSON arrays → List; render as a compact JSON array string
+        ArrowDataType::List(_) => {
+            let arr = array.as_any().downcast_ref::<ListArray>().unwrap();
+            let slice = arr.value(index);
+            let parts: Result<Vec<String>> = (0..slice.len())
+                .map(|i| {
+                    convert_array_value(&slice, i).map(|v| match &v {
+                        Value::String(s) => format!("\"{}\"", s),
+                        _ => v.to_string(),
+                    })
+                })
+                .collect();
+            Value::String(format!("[{}]", parts?.join(",")))
+        }
+        ArrowDataType::LargeList(_) => {
+            let arr = array.as_any().downcast_ref::<LargeListArray>().unwrap();
+            let slice = arr.value(index);
+            let parts: Result<Vec<String>> = (0..slice.len())
+                .map(|i| {
+                    convert_array_value(&slice, i).map(|v| match &v {
+                        Value::String(s) => format!("\"{}\"", s),
+                        _ => v.to_string(),
+                    })
+                })
+                .collect();
+            Value::String(format!("[{}]", parts?.join(",")))
         }
         ArrowDataType::Date32 => {
             let arr = array.as_any().downcast_ref::<Date32Array>().unwrap();
