@@ -135,7 +135,14 @@ pub type SharedState = Arc<std::sync::Mutex<AppState>>;
 #[tauri::command]
 pub fn load_path(path: String, state: State<'_, SharedState>) -> Result<Vec<String>, String> {
     let path_ref = std::path::Path::new(&path);
-    let mut loader = FileLoader::new().map_err(|e| e.to_string())?;
+
+    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+
+    // Reuse the existing context so previously loaded tables are preserved.
+    let mut loader = match app_state.context.take() {
+        Some(ctx) => FileLoader::from_context(ctx),
+        None => FileLoader::new().map_err(|e| e.to_string())?,
+    };
 
     if path_ref.is_file() {
         loader.load_file(path_ref).map_err(|e| e.to_string())?;
@@ -147,15 +154,21 @@ pub fn load_path(path: String, state: State<'_, SharedState>) -> Result<Vec<Stri
 
     let ctx = loader.into_context();
     let tables = ctx.list_tables();
-    
+
     if tables.is_empty() {
         return Err("No valid data files found".to_string());
     }
 
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
     app_state.context = Some(ctx);
-    
+
     Ok(tables)
+}
+
+#[tauri::command]
+pub fn clear_session(state: State<'_, SharedState>) -> Result<(), String> {
+    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+    app_state.context = None;
+    Ok(())
 }
 
 #[tauri::command]

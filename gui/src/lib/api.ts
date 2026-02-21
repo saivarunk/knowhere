@@ -42,3 +42,7 @@ export async function getRecentQueries(): Promise<RecentQuery[]> {
 export async function clearRecentQueries(): Promise<void> {
     return invoke<void>('clear_recent_queries');
 }
+
+export async function clearSession(): Promise<void> {
+    return invoke<void>('clear_session');
+}
