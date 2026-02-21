@@ -14,7 +14,10 @@
       "Bash(gh api:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "mcp__linear-server__create_issue",
+      "mcp__linear-server__get_team",
+      "mcp__linear-server__update_issue"
     ]
   }
 }
