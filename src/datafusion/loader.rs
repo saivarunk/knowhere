@@ -12,6 +12,7 @@ pub struct FileLoader {
 #[allow(dead_code)]
 pub enum FileFormat {
     Csv,
+    Json,
     Parquet,
     Delta,
     Sqlite,
@@ -45,6 +46,10 @@ impl FileLoader {
         match format {
             FileFormat::Csv => {
                 self.context.register_csv(&table_name, path)?;
+                Ok(vec![table_name])
+            }
+            FileFormat::Json => {
+                self.context.register_json(&table_name, path)?;
                 Ok(vec![table_name])
             }
             FileFormat::Parquet => {
@@ -144,6 +149,7 @@ fn detect_file_format(path: &Path) -> Result<FileFormat> {
 
     match extension.as_str() {
         "csv" => Ok(FileFormat::Csv),
+        "json" | "ndjson" | "jsonl" => Ok(FileFormat::Json),
         "parquet" | "pq" => Ok(FileFormat::Parquet),
         "db" | "sqlite" | "sqlite3" => Ok(FileFormat::Sqlite),
         _ => Err(DataFusionError::UnsupportedFormat(format!(

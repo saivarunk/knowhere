@@ -230,6 +230,113 @@ fn test_empty_result_handling() {
 }
 
 // ---------------------------------------------------------------------------
+// JSON tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_load_json() {
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let samples_dir = get_samples_dir();
+    let json_file = samples_dir.join("products.json");
+
+    let result = loader.load_file(&json_file);
+    assert!(
+        result.is_ok(),
+        "Failed to load JSON file: {:?}",
+        result.err()
+    );
+
+    let tables = result.unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0], "products");
+
+    let ctx = loader.into_context();
+    let query = ctx.execute_sql("SELECT * FROM products");
+    assert!(query.is_ok(), "SELECT * failed: {:?}", query.err());
+    assert_eq!(query.unwrap().row_count(), 10);
+}
+
+#[test]
+fn test_json_query_with_filter() {
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let json_file = get_samples_dir().join("products.json");
+
+    loader.load_file(&json_file).unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql("SELECT name FROM products WHERE category = 'Electronics'");
+    assert!(result.is_ok(), "Filtered query failed: {:?}", result.err());
+    // Laptop Pro, Wireless Mouse, Mechanical Keyboard, Monitor 4K, USB-C Hub, Webcam HD
+    assert_eq!(result.unwrap().row_count(), 6);
+}
+
+#[test]
+fn test_json_aggregation() {
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let json_file = get_samples_dir().join("products.json");
+
+    loader.load_file(&json_file).unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT category, COUNT(*) as cnt \
+         FROM products \
+         GROUP BY category \
+         ORDER BY category",
+    );
+    assert!(result.is_ok(), "Aggregation failed: {:?}", result.err());
+    let table = result.unwrap();
+    assert_eq!(table.row_count(), 3); // Electronics, Furniture, Stationery
+    assert_eq!(table.column_count(), 2);
+}
+
+#[test]
+fn test_json_join_with_csv() {
+    // Load a JSON table and a CSV table, then JOIN them — validates cross-format joins.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let samples_dir = get_samples_dir();
+
+    loader
+        .load_file(&samples_dir.join("products.json"))
+        .unwrap();
+    loader.load_file(&samples_dir.join("users.csv")).unwrap();
+    let ctx = loader.into_context();
+
+    // Both tables are queryable independently
+    let p = ctx.execute_sql("SELECT COUNT(*) FROM products").unwrap();
+    let u = ctx.execute_sql("SELECT COUNT(*) FROM users").unwrap();
+    assert_eq!(p.row_count(), 1);
+    assert_eq!(u.row_count(), 1);
+
+    // Cross-format join: each user gets a random product recommendation (CROSS JOIN LIMIT)
+    let result = ctx.execute_sql(
+        "SELECT u.name, p.name as product \
+         FROM users u \
+         CROSS JOIN products p \
+         WHERE p.in_stock = true \
+         LIMIT 5",
+    );
+    assert!(
+        result.is_ok(),
+        "Cross-format join failed: {:?}",
+        result.err()
+    );
+    assert_eq!(result.unwrap().row_count(), 5);
+}
+
+#[test]
+fn test_json_detection() {
+    // Verify all three recognised JSON extensions are detected correctly.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let samples_dir = get_samples_dir();
+    let json_file = samples_dir.join("products.json");
+
+    // .json loads successfully
+    let result = loader.load_file(&json_file);
+    assert!(result.is_ok(), "Expected .json to load: {:?}", result.err());
+}
+
+// ---------------------------------------------------------------------------
 // Delta Lake tests
 // ---------------------------------------------------------------------------
 

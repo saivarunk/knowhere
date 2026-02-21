@@ -1,4 +1,5 @@
 use datafusion::catalog::TableProviderFactory;
+use datafusion::datasource::file_format::options::NdJsonReadOptions;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::prelude::*;
@@ -80,6 +81,23 @@ impl DataFusionContext {
         self.runtime.block_on(async {
             let ctx = &self.session;
             ctx.register_parquet(&name, path_str, ParquetReadOptions::default())
+                .await?;
+            Ok::<_, DataFusionError>(())
+        })?;
+
+        self.table_names.push(name);
+        Ok(())
+    }
+
+    pub fn register_json(&mut self, name: impl Into<String>, path: &Path) -> Result<()> {
+        let name = name.into();
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| DataFusionError::Conversion("Invalid UTF-8 in path".to_string()))?;
+
+        self.runtime.block_on(async {
+            let ctx = &self.session;
+            ctx.register_json(&name, path_str, NdJsonReadOptions::default())
                 .await?;
             Ok::<_, DataFusionError>(())
         })?;
