@@ -564,7 +564,7 @@ version = "3.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d314cc62af2b6b0c65780555abb4d02a03dd3b799cd42419044f0c38d99738c0"
 dependencies = [
- "darling 0.20.11",
+ "darling 0.21.3",
  "ident_case",
  "prettyplease",
  "proc-macro2",
@@ -659,9 +659,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "bzip2"
@@ -1118,7 +1118,7 @@ dependencies = [
  "futures",
  "itertools 0.14.0",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "parquet",
  "rand 0.9.2",
@@ -1153,7 +1153,7 @@ dependencies = [
  "futures",
  "itertools 0.14.0",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "tokio",
 ]
@@ -1177,7 +1177,7 @@ dependencies = [
  "datafusion-session",
  "futures",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "tokio",
 ]
 
@@ -1196,7 +1196,7 @@ dependencies = [
  "indexmap 2.13.0",
  "libc",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parquet",
  "paste",
  "recursive",
@@ -1241,7 +1241,7 @@ dependencies = [
  "glob",
  "itertools 0.14.0",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parquet",
  "rand 0.9.2",
  "tempfile",
@@ -1272,7 +1272,7 @@ dependencies = [
  "datafusion-physical-plan",
  "datafusion-session",
  "futures",
- "object_store",
+ "object_store 0.12.5",
  "regex",
  "tokio",
 ]
@@ -1297,7 +1297,7 @@ dependencies = [
  "datafusion-physical-plan",
  "datafusion-session",
  "futures",
- "object_store",
+ "object_store 0.12.5",
  "serde_json",
  "tokio",
 ]
@@ -1326,7 +1326,7 @@ dependencies = [
  "futures",
  "itertools 0.14.0",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "parquet",
  "rand 0.9.2",
@@ -1351,7 +1351,7 @@ dependencies = [
  "datafusion-expr",
  "futures",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "rand 0.9.2",
  "tempfile",
@@ -1647,7 +1647,7 @@ dependencies = [
  "datafusion-common",
  "datafusion-expr",
  "datafusion-proto-common",
- "object_store",
+ "object_store 0.12.5",
  "prost",
 ]
 
@@ -1681,7 +1681,7 @@ dependencies = [
  "futures",
  "itertools 0.14.0",
  "log",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "tokio",
 ]
@@ -1716,7 +1716,7 @@ dependencies = [
  "futures",
  "indexmap 2.13.0",
  "itertools 0.14.0",
- "object_store",
+ "object_store 0.12.5",
  "parquet",
  "reqwest",
  "roaring 0.10.12",
@@ -1788,7 +1788,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "num_cpus",
- "object_store",
+ "object_store 0.12.5",
  "parking_lot",
  "parquet",
  "percent-encoding",
@@ -2738,7 +2738,7 @@ dependencies = [
  "deltalake",
  "iceberg",
  "iceberg-datafusion",
- "object_store",
+ "object_store 0.13.1",
  "parquet",
  "ratatui",
  "rusqlite",
@@ -3112,6 +3112,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "object_store"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2858065e55c148d294a9f3aae3b0fa9458edadb41a108397094566f4e3c0dfb"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "futures",
+ "http",
+ "humantime",
+ "itertools 0.14.0",
+ "parking_lot",
+ "percent-encoding",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+ "walkdir",
+ "wasm-bindgen-futures",
+ "web-time",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3239,7 +3263,7 @@ dependencies = [
  "lz4_flex",
  "num",
  "num-bigint",
- "object_store",
+ "object_store 0.12.5",
  "paste",
  "seq-macro",
  "simdutf8",
@@ -3407,7 +3431,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.112",
@@ -3521,7 +3545,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
