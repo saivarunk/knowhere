@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use arrow_array::{Int64Array, StringArray};
+use arrow_array::{Float64Array, Int64Array, StringArray};
 use arrow_schema::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
 use deltalake::kernel::{DataType as DeltaDataType, PrimitiveType};
 use deltalake::DeltaOps;
@@ -12,6 +13,7 @@ use iceberg::spec::{
 };
 use iceberg::{Catalog, CatalogBuilder, NamespaceIdent, TableCreation};
 use knowhere::datafusion::FileLoader;
+use parquet::arrow::ArrowWriter;
 
 fn get_samples_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples")
@@ -337,6 +339,128 @@ fn test_json_detection() {
 }
 
 // ---------------------------------------------------------------------------
+// Nested JSON tests
+// ---------------------------------------------------------------------------
+
+// employees_nested.json schema:
+//   id INT64, name STRING,
+//   address STRUCT<city STRING, country STRING>,
+//   skills LIST<STRING>
+
+#[test]
+fn test_json_nested_struct_load() {
+    // Verify the NDJSON reader infers nested objects as Struct columns.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let json_file = get_samples_dir().join("employees_nested.json");
+
+    let result = loader.load_file(&json_file);
+    assert!(
+        result.is_ok(),
+        "Failed to load nested JSON: {:?}",
+        result.err()
+    );
+
+    let ctx = loader.into_context();
+    let schema = ctx.get_table_schema("employees_nested");
+    assert!(schema.is_some(), "Schema should be available");
+
+    // Should have 4 columns: id, name, address (struct), skills (list)
+    let schema = schema.unwrap();
+    assert_eq!(schema.columns.len(), 4);
+
+    let all_rows = ctx.execute_sql("SELECT * FROM employees_nested");
+    assert!(all_rows.is_ok(), "SELECT * failed: {:?}", all_rows.err());
+    assert_eq!(all_rows.unwrap().row_count(), 5);
+}
+
+#[test]
+fn test_json_nested_struct_field_access() {
+    // Access a nested struct field using get_field().
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT name, get_field(address, 'city') AS city \
+         FROM employees_nested \
+         ORDER BY name",
+    );
+    assert!(
+        result.is_ok(),
+        "Struct field access failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    assert_eq!(table.row_count(), 5);
+    assert_eq!(table.column_count(), 2);
+}
+
+#[test]
+fn test_json_nested_struct_filter() {
+    // Filter on a nested struct field — only US-based employees.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT name, get_field(address, 'city') AS city \
+         FROM employees_nested \
+         WHERE get_field(address, 'country') = 'US' \
+         ORDER BY name",
+    );
+    assert!(result.is_ok(), "Struct filter failed: {:?}", result.err());
+    let table = result.unwrap();
+    // Alice (US), Charlie (US), Eve (US) → 3 rows
+    assert_eq!(table.row_count(), 3);
+}
+
+#[test]
+fn test_json_unnest_array() {
+    // Explode the skills array — each row becomes one row per skill.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT id, name, unnest(skills) AS skill \
+         FROM employees_nested \
+         ORDER BY id, skill",
+    );
+    assert!(result.is_ok(), "unnest(skills) failed: {:?}", result.err());
+    let table = result.unwrap();
+    // Alice:3, Bob:2, Charlie:3, Diana:3, Eve:2 → 13 total skill rows
+    assert_eq!(table.row_count(), 13);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_json_unnest_with_filter() {
+    // Unnest skills and filter to find all employees who know Rust.
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader
+        .load_file(&get_samples_dir().join("employees_nested.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT DISTINCT name \
+         FROM (SELECT id, name, unnest(skills) AS skill FROM employees_nested) \
+         WHERE skill = 'Rust' \
+         ORDER BY name",
+    );
+    assert!(result.is_ok(), "unnest + filter failed: {:?}", result.err());
+    let table = result.unwrap();
+    // Alice, Charlie, Eve know Rust → 3 distinct names
+    assert_eq!(table.row_count(), 3);
+}
+
+// ---------------------------------------------------------------------------
 // Delta Lake tests
 // ---------------------------------------------------------------------------
 
@@ -603,4 +727,226 @@ fn test_iceberg_detection_requires_metadata_dir() {
         result.is_err(),
         "Expected error for empty non-iceberg directory"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Cross-format JOIN tests (KNO-4)
+// ---------------------------------------------------------------------------
+
+/// Write a minimal `orders` Parquet file:
+///   id INT64, user_id INT64, amount FLOAT64, status STRING
+/// The user_ids (1-10) match the ids in samples/users.csv.
+fn create_orders_parquet(path: &std::path::Path) {
+    let schema = Arc::new(ArrowSchema::new(vec![
+        Field::new("id", ArrowDataType::Int64, false),
+        Field::new("user_id", ArrowDataType::Int64, false),
+        Field::new("amount", ArrowDataType::Float64, false),
+        Field::new("status", ArrowDataType::Utf8, false),
+    ]));
+
+    let batch = arrow_array::RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(Int64Array::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            ])),
+            Arc::new(Int64Array::from(vec![1, 1, 2, 3, 5, 1, 8, 10, 2, 7, 3, 5])),
+            Arc::new(Float64Array::from(vec![
+                99.98, 199.99, 149.97, 299.99, 399.98, 79.99, 249.95, 299.99, 159.98, 199.99,
+                99.98, 299.99,
+            ])),
+            Arc::new(StringArray::from(vec![
+                "completed",
+                "completed",
+                "completed",
+                "shipped",
+                "completed",
+                "pending",
+                "completed",
+                "shipped",
+                "completed",
+                "pending",
+                "completed",
+                "completed",
+            ])),
+        ],
+    )
+    .unwrap();
+
+    let file = File::create(path).unwrap();
+    let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+}
+
+/// Create a SQLite database with the same orders data.
+fn create_orders_sqlite(path: &std::path::Path) {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE orders (
+             id      INTEGER PRIMARY KEY,
+             user_id INTEGER NOT NULL,
+             amount  REAL    NOT NULL,
+             status  TEXT    NOT NULL
+         );
+         INSERT INTO orders VALUES (1,  1,  99.98,  'completed');
+         INSERT INTO orders VALUES (2,  1, 199.99,  'completed');
+         INSERT INTO orders VALUES (3,  2, 149.97,  'completed');
+         INSERT INTO orders VALUES (4,  3, 299.99,  'shipped');
+         INSERT INTO orders VALUES (5,  5, 399.98,  'completed');
+         INSERT INTO orders VALUES (6,  1,  79.99,  'pending');
+         INSERT INTO orders VALUES (7,  8, 249.95,  'completed');
+         INSERT INTO orders VALUES (8, 10, 299.99,  'shipped');
+         INSERT INTO orders VALUES (9,  2, 159.98,  'completed');
+         INSERT INTO orders VALUES (10, 7, 199.99,  'pending');
+         INSERT INTO orders VALUES (11, 3,  99.98,  'completed');
+         INSERT INTO orders VALUES (12, 5, 299.99,  'completed');",
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_cross_format_join_parquet_csv() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let parquet_path = tmp_dir.path().join("orders.parquet");
+    create_orders_parquet(&parquet_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_file(&parquet_path).unwrap();
+    loader
+        .load_file(&get_samples_dir().join("users.csv"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT u.name, o.amount, o.status \
+         FROM users u \
+         JOIN orders o ON u.id = o.user_id \
+         ORDER BY o.id",
+    );
+    assert!(
+        result.is_ok(),
+        "Parquet + CSV join failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    // All 12 orders reference valid user IDs (1–10), so 12 rows expected
+    assert_eq!(table.row_count(), 12);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_cross_format_join_parquet_csv_aggregated() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let parquet_path = tmp_dir.path().join("orders.parquet");
+    create_orders_parquet(&parquet_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_file(&parquet_path).unwrap();
+    loader
+        .load_file(&get_samples_dir().join("users.csv"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    // Total spend per department (Parquet orders joined with CSV users)
+    let result = ctx.execute_sql(
+        "SELECT u.department, COUNT(o.id) as order_count, SUM(o.amount) as total_spent \
+         FROM users u \
+         JOIN orders o ON u.id = o.user_id \
+         GROUP BY u.department \
+         ORDER BY total_spent DESC",
+    );
+    assert!(result.is_ok(), "Aggregated join failed: {:?}", result.err());
+    let table = result.unwrap();
+    assert!(table.row_count() > 0);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_cross_format_join_json_csv() {
+    // Join departments.json with users.csv on the department column
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let samples_dir = get_samples_dir();
+    loader
+        .load_file(&samples_dir.join("departments.json"))
+        .unwrap();
+    loader.load_file(&samples_dir.join("users.csv")).unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT u.name, u.salary, d.budget \
+         FROM users u \
+         JOIN departments d ON u.department = d.department \
+         ORDER BY u.name",
+    );
+    assert!(result.is_ok(), "JSON + CSV join failed: {:?}", result.err());
+    let table = result.unwrap();
+    // All 10 users have a matching department (Engineering/Marketing/Sales)
+    assert_eq!(table.row_count(), 10);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_cross_format_join_sqlite_csv() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let sqlite_path = tmp_dir.path().join("orders.db");
+    create_orders_sqlite(&sqlite_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_file(&sqlite_path).unwrap();
+    loader
+        .load_file(&get_samples_dir().join("users.csv"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT u.name, o.amount, o.status \
+         FROM users u \
+         JOIN orders o ON u.id = o.user_id \
+         WHERE o.status = 'completed' \
+         ORDER BY o.id",
+    );
+    assert!(
+        result.is_ok(),
+        "SQLite + CSV join failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    // completed orders: ids 1,2,3,5,7,9,11,12 → 8 rows
+    assert_eq!(table.row_count(), 8);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_three_way_cross_format_join() {
+    // Join all three formats in one query: Parquet orders + CSV users + JSON departments
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let parquet_path = tmp_dir.path().join("orders.parquet");
+    create_orders_parquet(&parquet_path);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let samples_dir = get_samples_dir();
+    loader.load_file(&parquet_path).unwrap();
+    loader.load_file(&samples_dir.join("users.csv")).unwrap();
+    loader
+        .load_file(&samples_dir.join("departments.json"))
+        .unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT u.name, u.department, d.budget, SUM(o.amount) as total_spent \
+         FROM users u \
+         JOIN orders o ON u.id = o.user_id \
+         JOIN departments d ON u.department = d.department \
+         GROUP BY u.name, u.department, d.budget \
+         ORDER BY total_spent DESC",
+    );
+    assert!(
+        result.is_ok(),
+        "Three-way cross-format join failed: {:?}",
+        result.err()
+    );
+    let table = result.unwrap();
+    assert!(table.row_count() > 0);
+    assert_eq!(table.column_count(), 4);
 }

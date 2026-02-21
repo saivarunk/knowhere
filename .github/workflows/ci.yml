@@ -7,28 +7,45 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test (${{ matrix.os }})
+  fmt:
+    name: Formatting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.check.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - id: check
+        name: Check formatting
+        run: cargo fmt --check
+
+  clippy-test:
+    name: Clippy & Tests (${{ matrix.os }})
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-
     runs-on: ${{ matrix.os }}
+    outputs:
+      clippy: ${{ steps.clippy.outcome }}
+      tests: ${{ steps.tests.outcome }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -37,11 +54,112 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Clippy
+      - id: clippy
+        name: Clippy
+        continue-on-error: true
         run: cargo clippy -- -D warnings
 
-      - name: Run tests
+      - id: tests
+        name: Run tests
+        if: always()
+        continue-on-error: true
         run: cargo test
+
+      - name: Fail if any check failed
+        if: steps.clippy.outcome == 'failure' || steps.tests.outcome == 'failure'
+        run: exit 1
+
+  comment:
+    name: PR Comment
+    needs: [fmt, clippy-test]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fmtResult    = '${{ needs.fmt.result }}';
+            const matrixResult = '${{ needs.clippy-test.result }}';
+            const clippyOut    = '${{ needs.clippy-test.outputs.clippy }}';
+            const testsOut     = '${{ needs.clippy-test.outputs.tests }}';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const fmtOk    = fmtResult    === 'success';
+            const clippyOk = clippyOut    !== 'failure';
+            const testsOk  = testsOut     !== 'failure';
+            // matrix result is the ground truth — if any OS failed, mark the whole thing failed
+            const matrixOk = matrixResult === 'success';
+            const allOk    = fmtOk && matrixOk;
+
+            const icon = ok => ok ? '✅' : '❌';
+
+            let body;
+            if (allOk) {
+              body = [
+                '## ✅ CI Passed',
+                '',
+                '| Check | Status |',
+                '|-------|--------|',
+                `| Formatting | ${icon(true)} |`,
+                `| Clippy     | ${icon(true)} |`,
+                `| Tests      | ${icon(true)} |`,
+                '',
+                'All checks passed on `ubuntu-latest` and `macos-latest`.',
+              ].join('\n');
+            } else {
+              // Per-step breakdown (best-effort; matrix outputs reflect the last-finishing job)
+              const clippyFailed = !clippyOk || (!fmtOk ? false : !matrixOk && clippyOk && testsOk ? false : !matrixOk);
+              const showClipper  = clippyOut === 'failure';
+              const showTests    = testsOut  === 'failure' || (matrixResult === 'failure' && !showClipper);
+
+              const fixes = [];
+              if (!fmtOk)      fixes.push('- **Formatting** — run `cargo fmt` and commit the result.');
+              if (showClipper) fixes.push('- **Clippy** — run `cargo clippy -- -D warnings` and fix all warnings.');
+              if (showTests)   fixes.push('- **Tests** — run `cargo test` locally to reproduce the failure.');
+              if (fixes.length === 0) fixes.push('- Check the [run details](' + runUrl + ') to identify the failing step.');
+
+              body = [
+                '## ❌ CI Failed',
+                '',
+                '| Check | Status |',
+                '|-------|--------|',
+                `| Formatting | ${icon(fmtOk)} |`,
+                `| Clippy     | ${icon(!showClipper)} |`,
+                `| Tests      | ${icon(!showTests)} |`,
+                '',
+                '### How to fix',
+                ...fixes,
+                '',
+                `[View full run details](${runUrl})`,
+              ].join('\n');
+            }
+
+            // Marker keeps the comment idempotent — re-runs update in place
+            const marker = '<!-- ci-summary -->';
+            body = marker + '\n' + body;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
