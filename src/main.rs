@@ -119,19 +119,28 @@ fn print_table(table: &Table) {
 
 fn print_csv(table: &Table) {
     // Header
-    let header: Vec<&str> = table.schema.columns.iter().map(|c| c.name.as_str()).collect();
+    let header: Vec<&str> = table
+        .schema
+        .columns
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
     println!("{}", header.join(","));
 
     // Rows
     for row in &table.rows {
-        let values: Vec<String> = row.values.iter().map(|v| {
-            let s = v.to_string();
-            if s.contains(',') || s.contains('"') || s.contains('\n') {
-                format!("\"{}\"", s.replace('"', "\"\""))
-            } else {
-                s
-            }
-        }).collect();
+        let values: Vec<String> = row
+            .values
+            .iter()
+            .map(|v| {
+                let s = v.to_string();
+                if s.contains(',') || s.contains('"') || s.contains('\n') {
+                    format!("\"{}\"", s.replace('"', "\"\""))
+                } else {
+                    s
+                }
+            })
+            .collect();
         println!("{}", values.join(","));
     }
 }
@@ -143,12 +152,20 @@ fn print_json(table: &Table) {
             print!(",");
         }
         print!("{{");
-        for (j, (col, val)) in table.schema.columns.iter().zip(row.values.iter()).enumerate() {
+        for (j, (col, val)) in table
+            .schema
+            .columns
+            .iter()
+            .zip(row.values.iter())
+            .enumerate()
+        {
             if j > 0 {
                 print!(",");
             }
             let val_str = match val {
-                knowhere::storage::table::Value::String(s) => format!("\"{}\"", s.replace('"', "\\\"")),
+                knowhere::storage::table::Value::String(s) => {
+                    format!("\"{}\"", s.replace('"', "\\\""))
+                }
                 knowhere::storage::table::Value::Null => "null".to_string(),
                 knowhere::storage::table::Value::Boolean(b) => b.to_string(),
                 _ => val.to_string(),

@@ -242,8 +242,14 @@ mod tests {
         ]);
         let mut table = Table::new("test", schema);
 
-        table.add_row(Row::new(vec![Value::Integer(1), Value::String("one".to_string())]));
-        table.add_row(Row::new(vec![Value::Integer(2), Value::String("two".to_string())]));
+        table.add_row(Row::new(vec![
+            Value::Integer(1),
+            Value::String("one".to_string()),
+        ]));
+        table.add_row(Row::new(vec![
+            Value::Integer(2),
+            Value::String("two".to_string()),
+        ]));
 
         assert_eq!(table.row_count(), 2);
         assert_eq!(table.column_count(), 2);

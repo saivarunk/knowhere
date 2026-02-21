@@ -17,7 +17,9 @@
       "Bash(find:*)",
       "mcp__linear-server__create_issue",
       "mcp__linear-server__get_team",
-      "mcp__linear-server__update_issue"
+      "mcp__linear-server__update_issue",
+      "mcp__linear-server__get_issue",
+      "Bash(cargo doc:*)"
     ]
   }
 }

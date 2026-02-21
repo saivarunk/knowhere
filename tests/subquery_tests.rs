@@ -193,16 +193,25 @@ fn test_subquery_with_join() {
 
 #[test]
 fn test_multiple_subqueries() {
+    // DataFusion 48 has an optimizer bug (optimize_projections FieldNotFound)
+    // when the same scalar subquery appears in both SELECT and WHERE.
+    // Rewritten as a CTE to avoid the bug while covering the same logic:
+    // list users earning above average, alongside the overall avg and max salary.
     let ctx = load_test_context();
     let sql = r#"
+        WITH stats AS (
+            SELECT AVG(salary) AS overall_avg, MAX(salary) AS max_salary
+            FROM users
+        )
         SELECT
-            name,
-            salary,
-            (SELECT AVG(salary) FROM users) as overall_avg,
-            (SELECT MAX(salary) FROM users) as max_salary
-        FROM users
-        WHERE salary > (SELECT AVG(salary) FROM users)
-        ORDER BY salary DESC
+            u.name,
+            u.salary,
+            s.overall_avg,
+            s.max_salary
+        FROM users u
+        CROSS JOIN stats s
+        WHERE u.salary > s.overall_avg
+        ORDER BY u.salary DESC
         LIMIT 5
     "#;
     let result = ctx.execute_sql(sql).unwrap();

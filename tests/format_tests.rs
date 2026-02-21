@@ -1,6 +1,11 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use knowhere::datafusion::{DataFusionContext, FileLoader};
+use arrow_array::{Int64Array, StringArray};
+use arrow_schema::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
+use deltalake::kernel::{DataType as DeltaDataType, PrimitiveType};
+use deltalake::DeltaOps;
+use knowhere::datafusion::FileLoader;
 
 fn get_samples_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples")
@@ -216,4 +221,151 @@ fn test_empty_result_handling() {
             assert_eq!(table.row_count(), 0);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Delta Lake tests
+// ---------------------------------------------------------------------------
+
+/// Create a minimal Delta table at `path` with columns (id INT64, name STRING,
+/// department STRING) and three rows, returning only after the write commits.
+fn create_delta_sample(path: &str) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let ops = DeltaOps::try_from_uri(path).await.unwrap();
+        let table = ops
+            .create()
+            .with_column(
+                "id",
+                DeltaDataType::Primitive(PrimitiveType::Long),
+                false,
+                None,
+            )
+            .with_column(
+                "name",
+                DeltaDataType::Primitive(PrimitiveType::String),
+                true,
+                None,
+            )
+            .with_column(
+                "department",
+                DeltaDataType::Primitive(PrimitiveType::String),
+                true,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let schema = Arc::new(ArrowSchema::new(vec![
+            Field::new("id", ArrowDataType::Int64, false),
+            Field::new("name", ArrowDataType::Utf8, true),
+            Field::new("department", ArrowDataType::Utf8, true),
+        ]));
+
+        let batch = arrow_array::RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["Alice", "Bob", "Charlie"])),
+                Arc::new(StringArray::from(vec![
+                    "Engineering",
+                    "Marketing",
+                    "Engineering",
+                ])),
+            ],
+        )
+        .unwrap();
+
+        DeltaOps(table).write(vec![batch]).await.unwrap();
+    });
+}
+
+#[test]
+fn test_load_delta_table() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_delta");
+    let table_path_str = table_path.to_str().unwrap().to_string();
+
+    create_delta_sample(&table_path_str);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let result = loader.load_directory(&table_path);
+    assert!(
+        result.is_ok(),
+        "Failed to load Delta table: {:?}",
+        result.err()
+    );
+
+    let tables = result.unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0], "employees_delta");
+
+    let ctx = loader.into_context();
+
+    let all_rows = ctx.execute_sql("SELECT * FROM employees_delta ORDER BY id");
+    assert!(all_rows.is_ok(), "SELECT * failed: {:?}", all_rows.err());
+    let table = all_rows.unwrap();
+    assert_eq!(table.row_count(), 3);
+    assert_eq!(table.column_count(), 3);
+}
+
+#[test]
+fn test_delta_query_with_filter() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_delta");
+    let table_path_str = table_path.to_str().unwrap().to_string();
+
+    create_delta_sample(&table_path_str);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_directory(&table_path).unwrap();
+    let ctx = loader.into_context();
+
+    let result =
+        ctx.execute_sql("SELECT name FROM employees_delta WHERE department = 'Engineering'");
+    assert!(result.is_ok(), "Filtered query failed: {:?}", result.err());
+    let table = result.unwrap();
+    // Alice and Charlie are in Engineering
+    assert_eq!(table.row_count(), 2);
+}
+
+#[test]
+fn test_delta_aggregation() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let table_path = tmp_dir.path().join("employees_delta");
+    let table_path_str = table_path.to_str().unwrap().to_string();
+
+    create_delta_sample(&table_path_str);
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    loader.load_directory(&table_path).unwrap();
+    let ctx = loader.into_context();
+
+    let result = ctx.execute_sql(
+        "SELECT department, COUNT(*) as cnt \
+         FROM employees_delta \
+         GROUP BY department \
+         ORDER BY department",
+    );
+    assert!(result.is_ok(), "Aggregation failed: {:?}", result.err());
+    let table = result.unwrap();
+    assert_eq!(table.row_count(), 2); // Engineering, Marketing
+    assert_eq!(table.column_count(), 2);
+}
+
+#[test]
+fn test_delta_detection_requires_delta_log() {
+    // A plain directory with no _delta_log should NOT be treated as Delta,
+    // so load_directory should fall through to file scanning (and fail if empty).
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let plain_dir = tmp_dir.path().join("not_a_delta_table");
+    std::fs::create_dir_all(&plain_dir).unwrap();
+
+    let mut loader = FileLoader::new().expect("Failed to create loader");
+    let result = loader.load_directory(&plain_dir);
+    // Empty directory → error, not a delta load
+    assert!(
+        result.is_err(),
+        "Expected error for empty non-delta directory"
+    );
 }

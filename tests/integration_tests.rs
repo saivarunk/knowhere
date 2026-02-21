@@ -28,7 +28,7 @@ fn load_test_context() -> DataFusionContext {
 #[test]
 fn test_select_all_from_users() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users").unwrap();
+    let result = ctx.execute_sql("SELECT * FROM users").unwrap();
 
     assert_eq!(result.row_count(), 10);
     assert_eq!(result.column_count(), 7);
@@ -37,7 +37,7 @@ fn test_select_all_from_users() {
 #[test]
 fn test_select_specific_columns() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT name, email FROM users").unwrap();
+    let result = ctx.execute_sql("SELECT name, email FROM users").unwrap();
 
     assert_eq!(result.column_count(), 2);
     assert_eq!(result.row_count(), 10);
@@ -46,7 +46,9 @@ fn test_select_specific_columns() {
 #[test]
 fn test_where_clause_comparison() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE age > 35").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE age > 35")
+        .unwrap();
 
     // Should include Charlie (45), Fiona (41), George (55), Ivan (38), Julia (42)
     assert_eq!(result.row_count(), 5);
@@ -55,8 +57,9 @@ fn test_where_clause_comparison() {
 #[test]
 fn test_where_clause_string() {
     let ctx = load_test_context();
-    let result =
-        ctx.execute_sql( "SELECT * FROM users WHERE department = 'Engineering'").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE department = 'Engineering'")
+        .unwrap();
 
     assert_eq!(result.row_count(), 5);
 }
@@ -64,10 +67,9 @@ fn test_where_clause_string() {
 #[test]
 fn test_where_and_condition() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT * FROM users WHERE department = 'Engineering' AND age > 35",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE department = 'Engineering' AND age > 35")
+        .unwrap();
 
     // Charlie (45), George (55), Ivan (38)
     assert_eq!(result.row_count(), 3);
@@ -76,10 +78,9 @@ fn test_where_and_condition() {
 #[test]
 fn test_where_or_condition() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT * FROM users WHERE department = 'Sales' OR department = 'Marketing'",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE department = 'Sales' OR department = 'Marketing'")
+        .unwrap();
 
     // Sales: Diana, Hannah; Marketing: Bob, Fiona, Julia
     assert_eq!(result.row_count(), 5);
@@ -88,7 +89,9 @@ fn test_where_or_condition() {
 #[test]
 fn test_order_by_asc() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT name, age FROM users ORDER BY age ASC").unwrap();
+    let result = ctx
+        .execute_sql("SELECT name, age FROM users ORDER BY age ASC")
+        .unwrap();
 
     // First should be Hannah (24)
     if let Value::Integer(age) = &result.rows[0].values[1] {
@@ -99,7 +102,9 @@ fn test_order_by_asc() {
 #[test]
 fn test_order_by_desc() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT name, age FROM users ORDER BY age DESC").unwrap();
+    let result = ctx
+        .execute_sql("SELECT name, age FROM users ORDER BY age DESC")
+        .unwrap();
 
     // First should be George (55)
     if let Value::Integer(age) = &result.rows[0].values[1] {
@@ -110,7 +115,7 @@ fn test_order_by_desc() {
 #[test]
 fn test_limit() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users LIMIT 3").unwrap();
+    let result = ctx.execute_sql("SELECT * FROM users LIMIT 3").unwrap();
 
     assert_eq!(result.row_count(), 3);
 }
@@ -118,7 +123,9 @@ fn test_limit() {
 #[test]
 fn test_limit_offset() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users LIMIT 3 OFFSET 2").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users LIMIT 3 OFFSET 2")
+        .unwrap();
 
     assert_eq!(result.row_count(), 3);
 }
@@ -126,7 +133,7 @@ fn test_limit_offset() {
 #[test]
 fn test_count_all() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT COUNT(*) FROM users").unwrap();
+    let result = ctx.execute_sql("SELECT COUNT(*) FROM users").unwrap();
 
     assert_eq!(result.row_count(), 1);
     if let Value::Integer(count) = &result.rows[0].values[0] {
@@ -137,8 +144,9 @@ fn test_count_all() {
 #[test]
 fn test_count_with_where() {
     let ctx = load_test_context();
-    let result =
-        ctx.execute_sql( "SELECT COUNT(*) FROM users WHERE department = 'Engineering'").unwrap();
+    let result = ctx
+        .execute_sql("SELECT COUNT(*) FROM users WHERE department = 'Engineering'")
+        .unwrap();
 
     if let Value::Integer(count) = &result.rows[0].values[0] {
         assert_eq!(*count, 5);
@@ -148,7 +156,7 @@ fn test_count_with_where() {
 #[test]
 fn test_sum() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT SUM(quantity) FROM orders").unwrap();
+    let result = ctx.execute_sql("SELECT SUM(quantity) FROM orders").unwrap();
 
     if let Value::Float(sum) = &result.rows[0].values[0] {
         assert!((sum - 22.0).abs() < 0.01);
@@ -158,7 +166,7 @@ fn test_sum() {
 #[test]
 fn test_avg() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT AVG(age) FROM users").unwrap();
+    let result = ctx.execute_sql("SELECT AVG(age) FROM users").unwrap();
 
     if let Value::Float(avg) = &result.rows[0].values[0] {
         assert!((avg - 36.9).abs() < 0.1);
@@ -168,7 +176,9 @@ fn test_avg() {
 #[test]
 fn test_min_max() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT MIN(age), MAX(age) FROM users").unwrap();
+    let result = ctx
+        .execute_sql("SELECT MIN(age), MAX(age) FROM users")
+        .unwrap();
 
     if let Value::Integer(min) = &result.rows[0].values[0] {
         assert_eq!(*min, 24);
@@ -181,10 +191,9 @@ fn test_min_max() {
 #[test]
 fn test_group_by() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT department, COUNT(*) FROM users GROUP BY department",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql("SELECT department, COUNT(*) FROM users GROUP BY department")
+        .unwrap();
 
     // Should have 3 groups: Engineering, Marketing, Sales
     assert_eq!(result.row_count(), 3);
@@ -193,10 +202,11 @@ fn test_group_by() {
 #[test]
 fn test_group_by_having() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT department, COUNT(*) FROM users GROUP BY department HAVING COUNT(*) > 2",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql(
+            "SELECT department, COUNT(*) FROM users GROUP BY department HAVING COUNT(*) > 2",
+        )
+        .unwrap();
 
     // Only Engineering (5) and Marketing (3) have more than 2
     assert_eq!(result.row_count(), 2);
@@ -205,10 +215,11 @@ fn test_group_by_having() {
 #[test]
 fn test_join() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT users.name, orders.id FROM users JOIN orders ON users.id = orders.user_id",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql(
+            "SELECT users.name, orders.id FROM users JOIN orders ON users.id = orders.user_id",
+        )
+        .unwrap();
 
     // Should match users with their orders
     assert!(result.row_count() > 0);
@@ -217,10 +228,11 @@ fn test_join() {
 #[test]
 fn test_left_join() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql(
-        "SELECT users.name, orders.id FROM users LEFT JOIN orders ON users.id = orders.user_id",
-    )
-    .unwrap();
+    let result = ctx
+        .execute_sql(
+            "SELECT users.name, orders.id FROM users LEFT JOIN orders ON users.id = orders.user_id",
+        )
+        .unwrap();
 
     // Should include all users, even those without orders
     assert!(result.row_count() >= 10);
@@ -229,7 +241,9 @@ fn test_left_join() {
 #[test]
 fn test_distinct() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT DISTINCT department FROM users").unwrap();
+    let result = ctx
+        .execute_sql("SELECT DISTINCT department FROM users")
+        .unwrap();
 
     assert_eq!(result.row_count(), 3);
 }
@@ -237,7 +251,9 @@ fn test_distinct() {
 #[test]
 fn test_like() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE name LIKE 'A%'").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE name LIKE 'A%'")
+        .unwrap();
 
     // Alice
     assert_eq!(result.row_count(), 1);
@@ -246,7 +262,9 @@ fn test_like() {
 #[test]
 fn test_like_middle() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE name LIKE '%son%'").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE name LIKE '%son%'")
+        .unwrap();
 
     // Alice Johnson, Edward Norton
     assert!(result.row_count() >= 1);
@@ -255,8 +273,9 @@ fn test_like_middle() {
 #[test]
 fn test_in_clause() {
     let ctx = load_test_context();
-    let result =
-        ctx.execute_sql( "SELECT * FROM orders WHERE status IN ('pending', 'shipped')").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM orders WHERE status IN ('pending', 'shipped')")
+        .unwrap();
 
     assert!(result.row_count() > 0);
 }
@@ -264,7 +283,9 @@ fn test_in_clause() {
 #[test]
 fn test_between() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE age BETWEEN 30 AND 40").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE age BETWEEN 30 AND 40")
+        .unwrap();
 
     // Alice (32), Diana (35), Ivan (38)
     assert_eq!(result.row_count(), 3);
@@ -274,21 +295,27 @@ fn test_between() {
 fn test_is_null() {
     let ctx = load_test_context();
     // All our test data has values, so this should return 0 rows
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE email IS NULL").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE email IS NULL")
+        .unwrap();
     assert_eq!(result.row_count(), 0);
 }
 
 #[test]
 fn test_is_not_null() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT * FROM users WHERE email IS NOT NULL").unwrap();
+    let result = ctx
+        .execute_sql("SELECT * FROM users WHERE email IS NOT NULL")
+        .unwrap();
     assert_eq!(result.row_count(), 10);
 }
 
 #[test]
 fn test_column_alias() {
     let ctx = load_test_context();
-    let result = ctx.execute_sql( "SELECT name AS user_name FROM users LIMIT 1").unwrap();
+    let result = ctx
+        .execute_sql("SELECT name AS user_name FROM users LIMIT 1")
+        .unwrap();
 
     assert_eq!(result.schema.columns[0].name, "user_name");
 }
@@ -296,8 +323,9 @@ fn test_column_alias() {
 #[test]
 fn test_arithmetic() {
     let ctx = load_test_context();
-    let result =
-        ctx.execute_sql( "SELECT quantity * price AS total FROM orders LIMIT 1").unwrap();
+    let result = ctx
+        .execute_sql("SELECT quantity * price AS total FROM orders LIMIT 1")
+        .unwrap();
 
     assert_eq!(result.column_count(), 1);
 }
