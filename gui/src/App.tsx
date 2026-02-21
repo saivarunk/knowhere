@@ -78,7 +78,7 @@ function App() {
         multiple: false,
         title: 'Select a file',
         filters: [
-          { name: 'Data Files', extensions: ['csv', 'parquet', 'pq', 'db', 'sqlite', 'sqlite3'] },
+          { name: 'Data Files', extensions: ['csv', 'json', 'ndjson', 'jsonl', 'parquet', 'pq', 'db', 'sqlite', 'sqlite3'] },
           { name: 'All Files', extensions: ['*'] },
         ],
       });
