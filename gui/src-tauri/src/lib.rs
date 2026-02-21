@@ -20,6 +20,7 @@ pub fn run() {
             commands::load_query,
             commands::get_recent_queries,
             commands::clear_recent_queries,
+            commands::clear_session,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

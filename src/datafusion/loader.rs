@@ -25,6 +25,12 @@ impl FileLoader {
         Ok(Self { context })
     }
 
+    /// Initialise a loader that registers files into an existing context,
+    /// preserving all previously loaded tables.
+    pub fn from_context(context: DataFusionContext) -> Self {
+        Self { context }
+    }
+
     pub fn load_file(&mut self, path: &Path) -> Result<Vec<String>> {
         if !path.exists() {
             return Err(DataFusionError::FileNotFound(

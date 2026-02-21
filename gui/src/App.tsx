@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { FolderOpen, Play, RefreshCw, GripHorizontal, Save, FileText, Clock, ChevronDown, Database } from 'lucide-react';
+import { FolderOpen, Play, RefreshCw, GripHorizontal, Save, FileText, Clock, ChevronDown, Database, Trash2 } from 'lucide-react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 import { Sidebar } from './components/Sidebar';
@@ -7,7 +7,7 @@ import { SqlEditor } from './components/Editor';
 import { ResultsTable } from './components/Results';
 import { StatusBar } from './components/StatusBar';
 import { useTheme } from './hooks/useTheme';
-import { loadPath, executeSql, getQueriesDirectory, saveQuery, loadQuery, getRecentQueries } from './lib/api';
+import { loadPath, executeSql, getQueriesDirectory, saveQuery, loadQuery, getRecentQueries, clearSession } from './lib/api';
 import type { QueryResult, RecentQuery } from './lib/types';
 
 function App() {
@@ -46,6 +46,20 @@ function App() {
     }
   };
 
+  const handleClearSession = useCallback(async () => {
+    try {
+      await clearSession();
+      setTables([]);
+      setSelectedTable(null);
+      setResult(null);
+      setError(null);
+      setStatus('idle');
+    } catch (err) {
+      console.error('Failed to clear session:', err);
+      setError(String(err));
+    }
+  }, []);
+
   const handleOpenFolder = useCallback(async () => {
     try {
       const selected = await open({
@@ -57,6 +71,7 @@ function App() {
       if (selected) {
         setLoadingPath(true);
         setError(null);
+        // Backend reuses the existing context — returned list includes all tables
         const tableList = await loadPath(selected);
         setTables(tableList);
         setResult(null);
@@ -241,6 +256,15 @@ function App() {
           >
             <FolderOpen size={14} />
             Open Folder
+          </button>
+          <button
+            onClick={handleClearSession}
+            disabled={loadingPath || tables.length === 0}
+            className="btn btn-secondary text-xs gap-1.5 disabled:opacity-50"
+            title="Clear all loaded tables and start a new session"
+          >
+            <Trash2 size={14} />
+            Clear
           </button>
         </div>
 
