@@ -17,6 +17,9 @@ pub enum DataFusionError {
     #[error("Delta Lake error: {0}")]
     Delta(#[from] deltalake::DeltaTableError),
 
+    #[error("Iceberg error: {0}")]
+    Iceberg(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

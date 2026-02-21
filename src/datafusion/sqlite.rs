@@ -3,13 +3,13 @@ use arrow::array::{
 };
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
 use arrow::record_batch::RecordBatch;
+use datafusion::catalog::Session;
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError as DFError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::context::SessionState;
 use datafusion::logical_expr::TableType;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion_datasource::memory::MemorySourceConfig;
 use rusqlite::Connection;
 use std::any::Any;
 use std::path::{Path, PathBuf};
@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use super::error::{DataFusionError, Result};
 
+#[derive(Debug)]
 pub struct SqliteTableProvider {
     db_path: PathBuf,
     table_name: String,
@@ -203,7 +204,7 @@ impl TableProvider for SqliteTableProvider {
 
     async fn scan(
         &self,
-        _state: &SessionState,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         _filters: &[datafusion::prelude::Expr],
         _limit: Option<usize>,
@@ -212,9 +213,9 @@ impl TableProvider for SqliteTableProvider {
             DFError::External(Box::new(e))
         })?;
 
-        let exec = MemoryExec::try_new(&[batches], self.schema.clone(), projection.cloned())?;
+        let exec = MemorySourceConfig::try_new_exec(&[batches], self.schema.clone(), projection.cloned())?;
 
-        Ok(Arc::new(exec))
+        Ok(exec)
     }
 }
 

@@ -5,7 +5,19 @@
       "Bash(cargo test:*)",
       "Bash(./target/release/knowhere:*)",
       "Bash(head:*)",
-      "Bash(cargo clean:*)"
+      "Bash(cargo clean:*)",
+      "Bash(wc:*)",
+      "WebSearch",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "mcp__linear-server__create_issue",
+      "mcp__linear-server__get_team",
+      "mcp__linear-server__update_issue"
     ]
   }
 }
