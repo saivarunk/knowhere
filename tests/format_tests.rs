@@ -369,11 +369,7 @@ fn test_json_nested_struct_load() {
     assert_eq!(schema.columns.len(), 4);
 
     let all_rows = ctx.execute_sql("SELECT * FROM employees_nested");
-    assert!(
-        all_rows.is_ok(),
-        "SELECT * failed: {:?}",
-        all_rows.err()
-    );
+    assert!(all_rows.is_ok(), "SELECT * failed: {:?}", all_rows.err());
     assert_eq!(all_rows.unwrap().row_count(), 5);
 }
 
@@ -416,11 +412,7 @@ fn test_json_nested_struct_filter() {
          WHERE get_field(address, 'country') = 'US' \
          ORDER BY name",
     );
-    assert!(
-        result.is_ok(),
-        "Struct filter failed: {:?}",
-        result.err()
-    );
+    assert!(result.is_ok(), "Struct filter failed: {:?}", result.err());
     let table = result.unwrap();
     // Alice (US), Charlie (US), Eve (US) → 3 rows
     assert_eq!(table.row_count(), 3);
@@ -440,11 +432,7 @@ fn test_json_unnest_array() {
          FROM employees_nested \
          ORDER BY id, skill",
     );
-    assert!(
-        result.is_ok(),
-        "unnest(skills) failed: {:?}",
-        result.err()
-    );
+    assert!(result.is_ok(), "unnest(skills) failed: {:?}", result.err());
     let table = result.unwrap();
     // Alice:3, Bob:2, Charlie:3, Diana:3, Eve:2 → 13 total skill rows
     assert_eq!(table.row_count(), 13);
@@ -466,11 +454,7 @@ fn test_json_unnest_with_filter() {
          WHERE skill = 'Rust' \
          ORDER BY name",
     );
-    assert!(
-        result.is_ok(),
-        "unnest + filter failed: {:?}",
-        result.err()
-    );
+    assert!(result.is_ok(), "unnest + filter failed: {:?}", result.err());
     let table = result.unwrap();
     // Alice, Charlie, Eve know Rust → 3 distinct names
     assert_eq!(table.row_count(), 3);
