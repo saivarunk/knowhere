@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::context::DataFusionContext;
 use super::error::{DataFusionError, Result};
@@ -88,9 +88,15 @@ impl FileLoader {
 
         // Check for Iceberg
         if is_iceberg_table(path) {
-            return Err(DataFusionError::UnsupportedFormat(
-                "Iceberg support not fully implemented yet".to_string(),
-            ));
+            let table_name = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| {
+                    DataFusionError::InvalidTableName("Invalid directory name".to_string())
+                })?
+                .to_string();
+            self.context.register_iceberg(&table_name, path)?;
+            return Ok(vec![table_name]);
         }
 
         // Load all files in directory
@@ -163,6 +169,7 @@ fn is_iceberg_table(path: &Path) -> bool {
 mod tests {
     use super::*;
     use std::env;
+    use std::path::PathBuf;
 
     fn get_samples_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples")
