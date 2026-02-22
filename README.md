@@ -1,6 +1,8 @@
 # Knowhere
 
-A powerful SQL engine for querying CSV, Parquet, Delta Lake, and SQLite files via an interactive TUI or command line. Built on Apache DataFusion for production-grade query performance.
+A powerful SQL engine for querying CSV, JSON, Parquet, Delta Lake, Iceberg, and SQLite files via a desktop GUI or interactive TUI. Built on Apache DataFusion for production-grade query performance.
+
+![Knowhere](docs/assets/knowhere-hero.png)
 
 ![Knowhere GUI](docs/assets/screenshots/gui-screenshot-1.png)
 
@@ -317,8 +319,10 @@ knowhere --query "SELECT * FROM data" --format json data.csv
 | Format | Extension | Features |
 |--------|-----------|----------|
 | CSV | `.csv` | Auto-delimiter detection, header inference |
+| JSON | `.json`, `.ndjson`, `.jsonl` | Newline-delimited JSON, nested structs and arrays |
 | Parquet | `.parquet`, `.pq` | All compression codecs (Snappy, GZIP, Brotli, Zstd, LZ4) |
 | Delta Lake | `_delta_log/` directory | Read Delta tables with ACID guarantees |
+| Apache Iceberg | `metadata/` directory | Read Iceberg tables via iceberg-rs |
 | SQLite | `.db`, `.sqlite`, `.sqlite3` | All tables loaded automatically |
 
 ## Supported SQL Features

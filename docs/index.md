@@ -2,6 +2,8 @@
 
 A powerful SQL engine for querying CSV, Parquet, Delta Lake, and SQLite files.
 
+![Knowhere](assets/knowhere-hero.png)
+
 <div class="grid cards" markdown>
 
 -   :material-monitor: **Desktop GUI**
